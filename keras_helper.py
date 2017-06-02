@@ -10,7 +10,7 @@ import numpy as np
 from itertools import chain
 
 # create the input vector
-def create_context(num_context, batch_size=1):
+def create_context(num_context):
     """
     create a dataset of 1 and 0 to feed into network, the context element
     is a 10 element vector that represents environmental context while training
@@ -21,12 +21,12 @@ def create_context(num_context, batch_size=1):
         batch_size: number of total input vectors for the network
     """
     context_data_set = []
-    for i in range(batch_size):
-        context_data_set.append(np.random.randint(2, num_context))
+    for i in range(num_context):
+        context_data_set.append(np.random.randint(0, high=2))
         # 2 indicates values in input vector can only be 1 or 0
     return context_data_set
 
-def create_cs(num_cs, batch_size=1):
+def create_cs(num_cs):
     """
     create dataset of 1 and 0 to feed into network, the cs element is a 5
     element vector that represnts the conditioned stimulus the network is
@@ -37,8 +37,8 @@ def create_cs(num_cs, batch_size=1):
         batch_size: number of total input vectors for the network
     """
     cs_data_set = []
-    for i in range(batch_size):
-        cs_data_set.append(np.random.randint(2, num_cs))
+    for i in range(num_cs):
+        cs_data_set.append(np.random.randint(0, high=2))
         # 2 indicates values in input vector can only be 1 or 0
     return cs_data_set
 
