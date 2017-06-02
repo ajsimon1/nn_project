@@ -17,7 +17,7 @@ import numpy as np
 import keras
 
 from keras.models import Sequential
-from keras.layers.core import Dense, Activation
+from keras.layers.core import Dense, Activation, Reshape
 from keras import initializers
 from keras import optimizers
 from keras import losses
@@ -57,14 +57,15 @@ y_final = utils.to_categorical(y_1)
 # create model skeleton
 model = Sequential()
 # create layers
+model.add(Dense(15, input_shape=(1,), activation=None,
+                name='input_layer', use_bias=False))
 model.add(Dense(units=40,  # neurons in layer
-                name='input_layer',
-                input_shape=(,15),
+                name='hidden_layer',
                 kernel_initializer=initializers.random_uniform(minval=-3.0,maxval=3.0),
                 ))
 model.add(Activation(activation='sigmoid'))
 model.add(Dense(units=1,
-                name='hidden_layer'))
+                name='output_layer'))
 
 # need to comple the model before training
 model.compile(optimizer=sgd, loss=msqe,
@@ -72,4 +73,6 @@ model.compile(optimizer=sgd, loss=msqe,
 
 # getting a consistent error on input shape
 # ValueError: Error when checking input: expected input_layer_input to have 3 dimensions, but got array with shape (15, 1)
-model.fit(cs_context_input_train, y_final)
+# got help for the above error @ https://stackoverflow.com/questions/43233169/keras-error-expected-dense-input-1-to-have-3-dimensions/43233458
+# now getting a new error
+model.fit(np.array(cs_context_input_train), y_final)

@@ -44,7 +44,7 @@ def create_cs(num_cs):
 
 def create_input(cs_data_set, context_data_set):
     # returns combined cs and context for input to netwrk
-    return np.fromiter(list(chain(cs_data_set, context_data_set)), dtype=np.float)
+    return list(cs_data_set + context_data_set)
     # NOTE: create_input must be run on indexed data sets, otherwise entire
     # dataset will be run
 
