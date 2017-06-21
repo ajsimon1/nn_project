@@ -32,7 +32,8 @@ BIAS = 1
 
 
 # other variables
-us = 1
+US_PRESENT = 1
+US_ABSENT = 0
 
 cs_input = create_cs(NUM_CS)
 context_input = create_context(NUM_CONTEXT)
@@ -50,29 +51,40 @@ msqe = losses.mean_squared_error
 context_input_train = create_context(NUM_CONTEXT)
 cs_context_input_train = create_input(cs_input, context_input_train)
 
-# y set for fit function, set cateogries?
-y_1 = range(100)
-y_final = utils.to_categorical(y_1)
-
+# set y as targer
+y_train = np.ndarray([15,1])
 # create model skeleton
 model = Sequential()
 # create layers
-model.add(Dense(15, input_shape=(1,), activation=None,
-                name='input_layer', use_bias=False))
 model.add(Dense(units=40,  # neurons in layer
+                input_shape=(15,),
                 name='hidden_layer',
-                kernel_initializer=initializers.random_uniform(minval=-3.0,maxval=3.0),
-                ))
+                kernel_initializer=initializers.random_uniform(minval=-3.0,
+                                                                maxval=3.0)))
 model.add(Activation(activation='sigmoid'))
-model.add(Dense(units=1,
-                name='output_layer'))
+model.add(Dense(units=2,
+                name='output_layer',
+                ))
+model.add(Activation(activation='softmax'))
 
 # need to comple the model before training
 model.compile(optimizer=sgd, loss=msqe,
               metrics=['accuracy'])
 
 # getting a consistent error on input shape
-# ValueError: Error when checking input: expected input_layer_input to have 3 dimensions, but got array with shape (15, 1)
-# got help for the above error @ https://stackoverflow.com/questions/43233169/keras-error-expected-dense-input-1-to-have-3-dimensions/43233458
+# ValueError: Error when checking input: expected input_layer_input to have
+# 3 dimensions, but got array with shape (15, 1)
+# got help for the above error @
+# https://stackoverflow.com/questions/43233169/keras-error-expected-dense-input-1-to-have-3-dimensions/43233458
 # now getting a new error
-model.fit(np.array(cs_context_input_train), y_final)
+# ValueError: Error when checking target: expected output_layer to have shape
+# (None, 1) but got array with shape (100, 100)
+# model.fit(np.array(cs_context_input_train), y_train)
+
+"""
+y set is the supervised output for corresponding X set, what you need to do
+is create an X set of 250 15 element lists, so an array of 250, 15.  for each
+15 the 10 'contxt' set should be identical, but the 5 'CS' should change
+1 set from the X should have an associated UR of 1 indicating the CR should yes
+all the others should be 0 indicating CR should be No
+"""
