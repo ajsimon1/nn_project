@@ -82,3 +82,22 @@ def set_us(dataset):
         else:
             lists.append('No US')
     return dataset
+
+"""need to id what the index is of the US in the dataset then add the identical
+sequence to the training or testing set, dpending on where the US is.  example
+if the US is in index 101 and the dataset is split at 125 then the copy
+needs to get added to above 125"""
+def copy_us(dataset):
+    for item in dataset:
+        if 'US' in item:
+            us_index = dataset.index(item)
+            return us_index
+        else:
+            print('US not found in dataset')
+        mid_dataset = len(dataset) / 2
+        if us_index < mid_dataset:
+            dataset.insert(int(us_index - 10),item)
+        else:
+            dataset.insert(int(us_index + 10),item)
+    return dataset
+    #
