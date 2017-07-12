@@ -24,7 +24,9 @@ from keras import utils
 
 from keras_helper import create_context, create_dataset, set_us
 
-"""To do, start working through new procedure w/ github intro"""
+"""To do, start working through new procedure w/ github intro
+https://github.com/fastforwardlabs/keras-hello-world/blob/master/kerashelloworld.ipynb
+"""
 # create optimizers
 sgd = optimizers.SGD()
 
