@@ -65,3 +65,24 @@ def create_trial(num_of_vectors_in_trial, num_elem_in_context, num_elem_in_cs):
         trial_dataset.append(list(itertools.chain(cs, context)))
 
     return np.asarray(trial_dataset)
+
+# function for median odd numbered set
+def get_median(num_set):
+    """quick helper to middle index of dataset"""
+    return int(np.ceil(num_set) / 2 + .5)
+
+"""
+# function to prepare data to input
+def prepare_data(dataset):
+    median = get_median(len(dataset))
+    dataset[median][0] = 1 # set median array value 1st element to 1
+    # iterate through data and assign '1' for 'US present' and '0'
+    # for 'US absent' as separate list at the end
+
+#####TO DO
+need to figure out how to assign the target to each vector in the trial
+maybe there should be a training and a trial dataset where the training has a
+16th element representing the targets and the trials do not?
+maybe look up the example on keras_main or find some documentation on
+binary classificationW
+"""
