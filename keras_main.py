@@ -17,61 +17,97 @@ import numpy as np
 
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Reshape
-from keras import initializers
-from keras import optimizers
-from keras import losses
-from keras import utils
+from keras import initializers, optimizers, losses, utils
+from keras.wrappers.scikit_learn import KerasClassifier
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.pipeline import Pipeline
 
-from keras_helper import create_context, create_dataset, set_us
+from keras_helper import create_context, create_dataset, set_us, copy_us
 
 """To do, start working through new procedure w/ github intro
 https://github.com/fastforwardlabs/keras-hello-world/blob/master/kerashelloworld.ipynb
 """
-# create optimizers
-sgd = optimizers.SGD()
-
-# create losses
-msqe = losses.mean_squared_error
-
 # define constants
 NUM_CS = 5
 NUM_CONTEXT = 10
 NUM_BATCH = 250
+EPOCHS = 100
+
+# set seed for reproducability
+seed = 7
+np.random.seed(seed)
 
 # create dataset
 context = create_context(NUM_CONTEXT)
 dataset = create_dataset(context, NUM_BATCH)
 
 # set US for 1 input set, this is set by random
-dataset_final = set_us(dataset)
+dataset_pre_final = set_us(dataset)
+# dataset_final = copy_us(dataset_pre_final)
 
 # clean dataset
-data_array = np.array(dataset_final)
+data_array = np.array(dataset_pre_final)
+# change to dataset_final if using copy_us function
 X = data_array[:, :15]
-y = data_array[:, -1:]
+Y = data_array[:, -1:]
 
+# encode the labels for y dataset to 1s and 0s
+encoder = LabelEncoder()
+encoder.fit(Y)
+encoded_Y = encoder.transform(Y)
+print(encoded_Y, X)
 # split data for training / testing
-train_X, test_X, train_y, test_y = train_test_split(X, y, train_size=0.5, random_state=0)
+# train_X, test_X, train_y, test_y =
+#train_test_split(X, y, train_size=0.5, random_state=0)
 
-# also need to add the US value to the training set as well
-
-
-# no do something similar with keras part
-
+# build model function taken from machinelearningmastery website
+# binary classification tutorial
 # create model skeleton
-model = Sequential()
-# create layers
-model.add(Dense(units=40,  # neurons in layer
-                input_shape=(15,),
-                name='hidden_layer',
-                kernel_initializer=initializers.random_uniform(minval=-3.0,
-                                                                maxval=3.0)))
-model.add(Activation(activation='sigmoid'))
-model.add(Dense(units=2,
-                name='output_layer',
-                ))
-model.add(Activation(activation='softmax'))
+def create_model():
+    model = Sequential()
+    # create layers
+    model.add(Dense(40,  # neurons in layer
+                    input_dim = 15,
+                    name ='hidden_layer',
+                    kernel_initializer='normal',
+                    activation='relu'))
+    model.add(Dense(1,
+                    name = 'output_layer',
+                    kernel_initializer = 'normal',
+                    activation = 'sigmoid'))
+    # need to comple the model before training
+    model.compile(optimizer = 'adam',
+                    loss = 'binary_crossentropy',
+                    metrics = ['accuracy'])
+    return model
 
-# need to comple the model before training
-model.compile(optimizer=sgd, loss=msqe,
-              metrics=['accuracy'])
+# evaluate model without standardized dataset
+estimator = KerasClassifier(build_fn=create_model,
+                            nb_epoch=EPOCHS,
+                            batch_size=NUM_BATCH,
+                            verbose=0)
+# evaluate model with non-standardized dataset
+kfold = StratifiedKFold()
+results = cross_val_score(estimator, X, encoded_Y, cv=kfold)
+print("Results: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
+
+# evaluate baseline model with standardized dataset
+np.random.seed(seed)
+estimators = []
+estimators.append(('standardize', StandardScaler()))
+estimators.append(('mlp', KerasClassifier(build_fn=create_model,
+                                            epochs=EPOCHS,
+                                            batch_size=NUM_BATCH,
+                                            verbose=0)))
+pipeline = Pipeline(estimators)
+kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
+results = cross_val_score(pipeline, X, encoded_Y, cv=kfold)
+print('Standardized: %.2f%% (%.2f%%)' % (results.mean()*100, results.std()*100))
+
+"""
+are we training the network on a single 'CS' then passing the CS to it?
+do we need to return what the 'CS' is while using set_us function?
+to we demonstrate that we can train the network then feed the network and have
+its predictability be 100%
+"""

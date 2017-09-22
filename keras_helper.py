@@ -27,49 +27,16 @@ def create_context(num_context):
         # 2 indicates values in input vector can only be 1 or 0
     return context_data_set
 
-def create_cs(num_cs):
-    """
-    create dataset of 1 and 0 to feed into network, the cs element is a 5
-    element vector that represnts the conditioned stimulus the network is
-    responding to.  the cs will change with every new trial.  at run
-    time the cs is coupled with the context to input into the network
-        arguments
-        num_cs: number of conditioned stimuli in each input vector
-        batch_size: number of total input vectors for the network
-    """
-    cs_data_set = []
-    for i in range(num_cs):
-        cs_data_set.append(np.random.randint(0, high=2))
-        # 2 indicates values in input vector can only be 1 or 0
-    return cs_data_set
-
-def create_input(cs_data_set, context_data_set):
-    # returns combined cs and context for input to netwrk
-    return list(cs_data_set + context_data_set)
-    # NOTE: create_input must be run on indexed data sets, otherwise entire
-    # dataset will be run
-
-"""
-def create_train_test_data(data_set, train_percent):
-    pass
-    splitting the data set into percentages for training and testing purposes
-        arguments:
-        dataset: complete data set to split
-        train_percent: the percentage of the dataset to use for training
-                        the remaining data will be used for testing
-"""
-
-"""create dataset 250, 15 with last column for labels"""
-# create context first, this will be the same for all 250 samples
-context = create_context(10)
-
 def create_dataset(context, int_len_dataset):
+    """creating the multidimensional array of 200 x 15"""
     dataset = []
-    for i in range(int_len_dataset + 1):
+    for i in range(int_len_dataset + 1): # creates the 200 part of loop
         temp_list = []
-        for cs_int in range(5):
+        for cs_int in range(5): # creates the cs
             temp_list.append(np.random.randint(0, high=2))
+            # appends cs to context creating single vector
         temp_list2 = list(itertools.chain(temp_list, context))
+        # above adds single vectors to multi D array
         dataset.append(temp_list2)
     return dataset
 
@@ -91,13 +58,19 @@ def copy_us(dataset):
     for item in dataset:
         if 'US' in item:
             us_index = dataset.index(item)
-            return us_index
+            break
         else:
-            print('US not found in dataset')
-        mid_dataset = len(dataset) / 2
-        if us_index < mid_dataset:
-            dataset.insert(int(us_index - 10),item)
-        else:
-            dataset.insert(int(us_index + 10),item)
+            continue
+    mid_dataset = len(dataset) / 2
+    if us_index < mid_dataset:
+        copy_index = mid_dataset + 10
+        dataset[int(copy_index)].pop()
+        dataset[int(copy_index)].append('US')
+        print('Original US Index located at {}, so copy US set at {}'.format(us_index, copy_index))
+    else:
+        copy_index = mid_dataset - 10
+        dataset[int(copy_index)].pop()
+        dataset[int(copy_index)].append('US')
+        print('Original US Index located at {}, so copy US set at {}'.format(us_index, copy_index))
     return dataset
     #
