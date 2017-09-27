@@ -38,16 +38,13 @@ EPOCHS = 100
 seed = 7
 np.random.seed(seed)
 
-# create dataset
-context = create_context(NUM_CONTEXT)
-dataset = create_dataset(context, NUM_BATCH)
-
-# set US for 1 input set, this is set by random
-dataset_pre_final = set_us(dataset)
-# dataset_final = copy_us(dataset_pre_final)
+# create dataset w/o target
+data_trial_array = create_trial(NUM_BATCH, NUM_CONTEXT, NUM_CS)
 
 # clean dataset
-data_array = np.array(dataset_pre_final)
+# TO DO
+data_final = prepare_data(data_trial_array)
+
 # change to dataset_final if using copy_us function
 X = data_array[:, :15]
 Y = data_array[:, -1:]

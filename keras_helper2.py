@@ -71,14 +71,20 @@ def get_median(num_set):
     """quick helper to middle index of dataset"""
     return int(np.ceil(num_set) / 2 + .5)
 
-"""
 # function to prepare data to input
 def prepare_data(dataset):
     median = get_median(len(dataset))
     dataset[median][0] = 1 # set median array value 1st element to 1
     # iterate through data and assign '1' for 'US present' and '0'
     # for 'US absent' as separate list at the end
-
+    for vector in dataset:
+        if vector[0] == 1:
+            np.append(vector, 1)
+            print("just appended 1 to vector")
+        else:
+            np.append(vector, 0)
+    return dataset
+"""
 #####TO DO
 need to figure out how to assign the target to each vector in the trial
 maybe there should be a training and a trial dataset where the training has a
