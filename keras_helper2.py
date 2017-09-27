@@ -64,7 +64,7 @@ def create_trial(num_of_vectors_in_trial, num_elem_in_context, num_elem_in_cs):
     for i in range(num_of_vectors_in_trial):
         trial_dataset.append(list(itertools.chain(cs, context)))
 
-    return np.asarray(trial_dataset)
+    return trial_dataset
 
 # function for median odd numbered set
 def get_median(num_set):
@@ -79,11 +79,11 @@ def prepare_data(dataset):
     # for 'US absent' as separate list at the end
     for vector in dataset:
         if vector[0] == 1:
-            np.append(vector, 1)
-            print("just appended 1 to vector")
+            vector.append(1)
+            print("just appended 1 to vector at index {} of the dataset".format(dataset.index(vector)))
         else:
-            np.append(vector, 0)
-    return dataset
+            vector.append(0)
+    return np.asarray(dataset)
 """
 #####TO DO
 need to figure out how to assign the target to each vector in the trial

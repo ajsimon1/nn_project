@@ -23,7 +23,7 @@ from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
 
-from keras_helper import create_context, create_dataset, set_us, copy_us
+from keras_helper2   import create_context, create_cs, create_trial, prepare_data
 
 """To do, start working through new procedure w/ github intro
 https://github.com/fastforwardlabs/keras-hello-world/blob/master/kerashelloworld.ipynb
