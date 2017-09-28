@@ -79,16 +79,12 @@ def prepare_data(dataset):
     # for 'US absent' as separate list at the end
     for vector in dataset:
         if vector[0] == 1:
-            vector.append(1)
+            vector.append("US Present")
             print("just appended 1 to vector at index {} of the dataset".format(dataset.index(vector)))
         else:
-            vector.append(0)
+            vector.append("No US")
     return np.asarray(dataset)
 """
-#####TO DO
-need to figure out how to assign the target to each vector in the trial
-maybe there should be a training and a trial dataset where the training has a
-16th element representing the targets and the trials do not?
-maybe look up the example on keras_main or find some documentation on
-binary classificationW
+data set complete, final array is 25 x 16 with last item in each vector
+the US present or not indicating whether the CS should predict the US
 """
