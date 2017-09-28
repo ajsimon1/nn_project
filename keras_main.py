@@ -23,15 +23,16 @@ from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
 
-from keras_helper2   import create_context, create_cs, create_trial, prepare_data
+from keras_helper2 import create_context, create_cs, create_trial, prepare_data
 
 """To do, start working through new procedure w/ github intro
 https://github.com/fastforwardlabs/keras-hello-world/blob/master/kerashelloworld.ipynb
 """
 # define constants
+# in website app these should come from UI
 NUM_CS = 5
 NUM_CONTEXT = 10
-NUM_BATCH = 250
+NUM_BATCH = 25
 EPOCHS = 100
 
 # set seed for reproducability
@@ -39,24 +40,24 @@ seed = 7
 np.random.seed(seed)
 
 # create dataset w/o target
+# target dataset should be a n X 15 python based array
 data_trial_array = create_trial(NUM_BATCH, NUM_CONTEXT, NUM_CS)
 
-# clean dataset
-# TO DO
+# add US as 16th element of array, applicable only for
+# training dataset
+# this function also returns the ndarray for the first time
 data_final = prepare_data(data_trial_array)
 
-# change to dataset_final if using copy_us function
-X = data_array[:, :15]
-Y = data_array[:, -1:]
+# splitting dataset into the X = input(CS & context) and Y = output(US)
+X = data_final[:, :15]
+Y = data_final[:, -1:]
+
 
 # encode the labels for y dataset to 1s and 0s
 encoder = LabelEncoder()
 encoder.fit(Y)
 encoded_Y = encoder.transform(Y)
 print(encoded_Y, X)
-# split data for training / testing
-# train_X, test_X, train_y, test_y =
-#train_test_split(X, y, train_size=0.5, random_state=0)
 
 # build model function taken from machinelearningmastery website
 # binary classification tutorial
@@ -83,12 +84,13 @@ def create_model():
 estimator = KerasClassifier(build_fn=create_model,
                             nb_epoch=EPOCHS,
                             batch_size=NUM_BATCH,
-                            verbose=0)
+                            verbose=1)
 # evaluate model with non-standardized dataset
 kfold = StratifiedKFold()
 results = cross_val_score(estimator, X, encoded_Y, cv=kfold)
 print("Results: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
 
+"""
 # evaluate baseline model with standardized dataset
 np.random.seed(seed)
 estimators = []
@@ -101,10 +103,4 @@ pipeline = Pipeline(estimators)
 kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
 results = cross_val_score(pipeline, X, encoded_Y, cv=kfold)
 print('Standardized: %.2f%% (%.2f%%)' % (results.mean()*100, results.std()*100))
-
-"""
-are we training the network on a single 'CS' then passing the CS to it?
-do we need to return what the 'CS' is while using set_us function?
-to we demonstrate that we can train the network then feed the network and have
-its predictability be 100%
 """
