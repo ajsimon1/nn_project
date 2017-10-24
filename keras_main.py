@@ -14,7 +14,8 @@ weights are fixed.  as such the input vector is passed directly to the cortical
 hidden layer, where there is an activation function.
 """
 import numpy as np
-
+import pydot
+import graphviz
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Reshape
 from keras import initializers, optimizers, losses, utils
@@ -22,6 +23,9 @@ from keras.wrappers.scikit_learn import KerasClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
+from keras.utils import plot_model
+import matplotlib.pyplot as plt
+from keras.callbacks import NBatchLogger
 
 from keras_helper2 import create_context, create_cs, create_trial, prepare_data
 
@@ -57,7 +61,7 @@ Y = data_final[:, -1:]
 encoder = LabelEncoder()
 encoder.fit(Y)
 encoded_Y = encoder.transform(Y)
-print(encoded_Y, X)
+# print(encoded_Y, X)
 
 # build model function taken from machinelearningmastery website
 # binary classification tutorial
@@ -78,17 +82,31 @@ def create_model():
     model.compile(optimizer = 'adam',
                     loss = 'binary_crossentropy',
                     metrics = ['accuracy'])
-    return model
+    history = NBatchLogger()
+    model.fit(X, encoded_Y, validation_split=.33, callbacks=[history])
+    print(model.get_input_at(0))
 
+
+    return model
 # evaluate model without standardized dataset
 estimator = KerasClassifier(build_fn=create_model,
                             nb_epoch=EPOCHS,
                             batch_size=NUM_BATCH,
-                            verbose=1)
+                            verbose=0)
+
 # evaluate model with non-standardized dataset
 kfold = StratifiedKFold()
 results = cross_val_score(estimator, X, encoded_Y, cv=kfold)
+# estimator holds results for epoch/batch and prints out on request
 print("Results: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
+
+# print(results)
+# TODO write custom class to print better results, see github issue
+# https://github.com/fchollet/keras/issues/2850
+# https://github.com/fchollet/keras/issues/254
+# TODO add variable for optimizer to adjust learning rate based on user entry
+# this allows for the 2 drug related models
+
 
 """
 # evaluate baseline model with standardized dataset
