@@ -39,8 +39,7 @@ def create_cs(num_of_batches, num_elem_in_cs):
     create the cs to chain to context, cs is a 5 element vector with 1 vector
     having '1' to inditace that a 'US' is expected
     """
-    # cs = list(np.zeros((num_of_batches, num_elem_in_cs)))
-    cs = [[0 for i in range(num_of_batches)] for j in range(num_elem_in_cs)]
+    cs = [[0 for i in range(num_elem_in_cs)] for j in range(num_of_batches)]
     rand_number = np.random.randint(0, high=len(cs))
     cs[rand_number][0] = 1.0
     return cs
