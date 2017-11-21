@@ -36,20 +36,12 @@ def create_context(num_elem_in_context):
     return context_vector
 
 # function to create cs
-def create_cs(num_elem_in_cs):
+def create_cs(batches_for_run, num_elem_in_cs):
     """
-    create cs that represents elements 0-4 in 15 element input vector, the
-    elements are set to '0' initially and a 'US present' CS will be set with
-    another function
-    arguments:
-        num_elem_in_cs --> number of elements in the CS
-    return --> x element vector equal to num_elem_in_cs argument [x, x, x,...]
+    create the cs to chain to context, cs is a 5 element vector with 1 vector
+    having '1' to inditace that a 'US' is expected
     """
-    cs_vector = []
-    for i in range(num_elem_in_cs):
-        cs_vector.append(0)
-        # 2 indicates values in input vector can only be 1 or 0
-    return cs_vector
+    return np.zeroes((batches_for_run, num_elem_in_cs))
 
 # function to create trials
 def create_trial(num_of_vectors_in_trial, num_elem_in_context, num_elem_in_cs):
