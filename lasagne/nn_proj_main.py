@@ -1,3 +1,11 @@
+"""
+created 9/20/17
+
+author: adam
+
+hour vested to date (11/18/17) --> ~ 45
+"""
+
 import theano
 import theano.tensor as T
 import numpy as np
@@ -12,9 +20,10 @@ import matplotlib.pyplot as plt
 # data = input to the network
 # targets = what the expected output is per data/input
 # remeber the .zip() function if you need to compare the iterables
+# TODO add the theano dat declration to a build network function
 X_data = T.matrix('X_data') # data
 Y_targets = T.matrix('Y_targets') # targets
-# CONSTANTS
+# CONSTANTS TODO add the constants to an input prompt
 NUM_OF_CS = 5 # the variable conditioned stimuls coupled with the context
 NUM_OF_CONTEXT = 10 # the immutable context that reflects the 'environment'
 # CS & CONTEXT are combined to equal an 'input vector'
@@ -31,8 +40,15 @@ data = create_input_vector(NUM_OF_TRIALS, NUM_OF_CS, NUM_OF_CONTEXT)
 # match 'US' target with input vector containing '1' as first element
 targets = create_targets(data)
 # print(targets)
-# TODO split into train & test data?
+# TODO split into train & test data?, yes see lower comment on intializing
+# using all zeroes
 
+
+
+# TODO add function here to biuld the network
+# the shape of the input should be a variable equal to cs + context
+# add parameters to change the activation functions and/or number of hidden
+# layer units
 # defining the model, a 3 layer model with 1 input, 1 hidden, 1 output
 # all initial paramters including weights matrix and biases are set by
 # lasagne neural network framework defaults, changes can be made if needed
@@ -59,8 +75,7 @@ predictions = lasagne.layers.get_output(l3)
 func_feed_data_through_nn = theano.function([X_data],
                                             predictions,
                                             allow_input_downcast=True)
-# TODO having issues with the shape of 'data'
-# TODO test function was fn(np.random.randn(3, 784)) where 3 is batches
+# test function was fn(np.random.randn(3, 784)) where 3 is batches
 # and 784 is first layer input
 # this comes out as 'array[# of batches[# of units]]'
 # func_feed_data_through_nn(data) moved this to the Epoch loop
@@ -97,6 +112,8 @@ func_update_network = theano.function([X_data],
                                     allow_input_downcast=True)
 master_predictions_list = []
 
+# remember to load all context first (zeroes) to get over that initial
+# dowards trend towards 0
 for epoch in range(NUM_OF_BATCHES):
     func_feed_data_through_nn(data)
     predictions_list = func_update_network(data)
@@ -116,22 +133,11 @@ while counter < len(another_list):
 cs_index = np.where(targets==1.)
 
 cs_output_list = []
-# print(len(new_list))
-# print(int(cs_index[0]))
-# print(len(new_list[0]))
-
 
 for item in new_list:
     cs_output_list.append(item[int(cs_index[0])])
 input_output = list(zip(list(data), list(targets)))
 
-print(data)
-print('\n')
-print(targets)
-print('\n')
-print(cs_output_list)
-
-# TODO need a pyplot for output predictions data
 plt.plot(cs_output_list)
 plt.ylabel('Final Output')
 plt.xlabel('Trial #')
