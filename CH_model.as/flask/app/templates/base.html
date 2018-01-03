@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="stylesheet"
+              href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css"
+              integrity="sha512-dTfge/zgoMYpP7QbHy4gWMEGsbsdZeCXz7irItjcC3sPUFtf0kuFbDz/ixG7ArTxmDjLXDmezHubeNikyKGVyQ=="
+              crossorigin="anonymous">
+        {% if title %}
+        <title>A.Sim | {{ title }}</title>
+        {% else %}
+        <title>A.Sim on Projects</title>
+        {% endif %}
+        {% block navbar %}
+        <div class="navbar navbar-inverse" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle"
+                    data-toggle="collapse" data-target=".navbar-collapse">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" href="/">AS.labs</a>
+                </div>
+            </div>
+        </div>
+        {% endblock %}
+        <!-- <header><p>Logged in as {{ player }}</p></p.></header> -->
+    </head>
+    <div class='container'>
+        {% if session['logged_in'] == True %}
+            <div class="container"><p>Logged in as {{ session['username'] }}</p></div>
+        {% endif %}
+      <body>
+        {% block content %}
+          <div class="container">
+            {% for message in get_flashed_messages() %}
+                <div class="alert alert-success alert-dismissible" role="alert">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            {% endfor %}
+          </div>
+        {% endblock %}
+      </body>
+    </div>
+</html>

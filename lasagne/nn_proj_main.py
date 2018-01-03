@@ -12,7 +12,7 @@ import numpy as np
 import lasagne
 from lasagne.nonlinearities import sigmoid, rectify
 from lasagne.objectives import binary_crossentropy, aggregate
-from DEPRECATED_nn_proj_utils import create_input_vector, create_targets
+from nn_proj_utils import create_input_vector, create_targets
 import pprint
 import matplotlib.pyplot as plt
 
@@ -105,7 +105,6 @@ updates = lasagne.updates.adam(loss, params, learning_rate)
 # loss = the mean of loss average for each trial over the entire batch
 # the predictions of every trial in the batch
 # ie every feed forward gets a backpropagation
-# TODO pick up ###===HERE===###
 predictions_list = []
 func_update_network = theano.function([X_data],
                                     predictions,
@@ -115,7 +114,6 @@ master_predictions_list = []
 
 # remember to load all context first (zeroes) to get over that initial
 # dowards trend towards 0
-train_vec = np.zeros((num_of_batches, num_of_cs + num_of_context))
 for epoch in range(NUM_OF_BATCHES):
     func_feed_data_through_nn(data)
     predictions_list = func_update_network(data)
@@ -139,9 +137,6 @@ cs_output_list = []
 for item in new_list:
     cs_output_list.append(item[int(cs_index[0])])
 input_output = list(zip(list(data), list(targets)))
-
-pp = pprint.PrettyPrinter()
-pp.pprint(cs_output_list)
 
 plt.plot(cs_output_list)
 plt.ylabel('Final Output')
