@@ -96,51 +96,103 @@ def create_targets(input_vector):
         else:
             targets.append([0.0])
     return np.asarray(targets)
+# identify where in the array the us was present, looking for '1.'
+cs_index = np.where(targets==1.)
+# #############################################################################
+# #################### build hippocampal networks #############################
+# #############################################################################
+def build_hipp_network():
+    hipp_l1 = lasagne.layers.InputLayer(shape=(None, 15), input_var=X_data)
+    hipp_l2 = lasagne.layers.DenseLayer(hipp_l1,
+                                            num_units=8,
+                                            nonlinearity=lasagne.nonlinearities.rectify)
+
+    hipp_l3 = lasagne.layers.DenseLayer(hipp_l2,
+                                            num_units=15,
+                                            nonlinearity=lasagne.nonlinearities.sigmoid)
+
+    hipp_hid_layer_act, hipp_out_layer_act = lasagne.layers.get_output([hipp_l2,
+                                                                        hipp_l3])
+    return hipp_hid_layer_act, hipp_out_layer_act
+
+def train_hipp_network():
+    hipp_params = lasagne.layers.get_all_params(hipp_l3, trainable=True)
+
+    hipp_loss = lasagne.objectives.squared_error(hipp_l1.input_var,
+                                                hipp_out_layer_act).mean()
+
+    hipp_updates = lasagne.updates.adadelta(hipp_loss,
+                                            hipp_params,
+                                            rho=0.75,
+                                            learning_rate = LEARN_RATE)
+    hipp_updates = lasagne.updates.apply_momentum(hipp_updates,
+                                                    params=hipp_params)
+    return hipp_updates
+
+def run_hipp_network():
+    func_feed_forward_hipp_net = theano.function([X_data],
+                                hipp_out_layer_act,
+                                allow_input_downcast=True)
+
+    func_update_hipp_net = theano.function([X_data],
+                            [hipp_out_layer_act,
+                            hipp_hid_layer_act],
+                            updates=hipp_updates,
+                            allow_input_downcast=True)
 
 # #############################################################################
 # ##################### build cortical networks ###############################
 # #############################################################################
-cort_l1 = lasagne.layers.InputLayer(shape=(None, 15),
-                               input_var=X_data,
-                               W=Constant(0.0))
-cort_l2 = lasagne.layers.DenseLayer(cort_l1, num_units=40,
-                               nonlinearity=lasagne.nonlinearities.rectify)
-cort_l3 = lasagne.layers.DenseLayer(cort_l2, num_units=1,
-                               nonlinearity=lasagne.nonlinearities.sigmoid)
-cort_hid_layer_act, cort_out_layer_act = lasagne.layers.get_output([cort_l2,
-                                                                    cort_l3])
+def build_cort_network():
+    cort_l1 = lasagne.layers.InputLayer(shape=(None, 15),
+                                   input_var=X_data,
+                                   W=Constant(0.0),
+                                   b=Constant(0.0))
+    cort_l2 = lasagne.layers.DenseLayer(cort_l1, num_units=40,
+                                   nonlinearity=lasagne.nonlinearities.rectify)
+    cort_l3 = lasagne.layers.DenseLayer(cort_l2, num_units=1,
+                                   nonlinearity=lasagne.nonlinearities.sigmoid)
+    cort_hid_layer_act, cort_out_layer_act = lasagne.layers.get_output([cort_l2,
+                                                                        cort_l3])
+    return cort_hid_layer_act, cort_out_layer_act
 
-# executing the function that pushes input data (x) through the system using
-# equation defined by Y, Y then becomes the actual output, ie output layer
-# activations.  also grabbing hidden layer activations for hamming distance
-# last variable allows lasagne to automatically downcast any higher bit dtype
-# to a lower dtype, a float64 to a float32 for example
-func_feed_forward_cort_net = theano.function([X_data],
-                                            [cort_out_layer_act,
-                                             cort_hid_layer_act],
-                                            allow_input_downcast=True)
-# remove trainable tag so that lower layer weights are not trained
-cort_l2.params[cort_l2.W].remove('trainable')
-cort_l2.params[cort_l2.b].remove('trainable')
-# get the parameters, trainable=True only returns parameters that can be trained
-cort_l3_params = lasagne.layers.get_all_params(cort_l3, trainable=True)
-# output_layer_activation = actual output of the network, i.e. what output is
-# targets is the supervised output, i.e. what output should be
-cort_upper_layer_loss = binary_crossentropy(cort_out_layer_act, targets)
-# TODO cort_loss = binary_crossentropy(cort_hid_layer_act, hipp_hid_layer_act)
-# TODO convert hipp_hid_layer_act to same shape as cort_hid_layer_act
-cort_upper_layer_loss = aggregate(cort_upper_layer_loss, mode='mean') # mean loss across all batches
-# get the gradient of a loss function with respect to these parameters
-cort_grads = theano.grad(cort_upper_layer_loss, wrt=cort_l3_params)
-# using built in stochasitc gradient descent 'sgd'
-# in below function, this will 'update' the network
-cort_updates = lasagne.updates.adam(cort_loss, cort_params, LEARN_RATE)
-# function for error backpropagation and updating the network paramters
-func_update_cort_net = theano.function([X_data],
-                                    [cort_out_layer_act,
-                                     cort_hid_layer_act],
-                                    updates=cort_updates,
-                                    allow_input_downcast=True)
+def train_cort_network():
+    # TODO add a parameter for 'intact' or 'lesion' to drive a logic statement
+    # remove trainable tag so that lower layer weights are not trained
+    cort_l2.params[cort_l2.W].remove('trainable')
+    cort_l2.params[cort_l2.b].remove('trainable')
+    # get the parameters, trainable=True only returns parameters that can be trained
+    cort_l3_params = lasagne.layers.get_all_params(cort_l3, trainable=True)
+    # output_layer_activation = actual output of the network, i.e. what output is
+    # targets is the supervised output, i.e. what output should be
+    cort_upper_layer_loss = binary_crossentropy(cort_out_layer_act, targets)
+    cort_lower_layer_loss = binary_crossentropy(cort_hid_layer_act,
+                                                hipp_hid_layer_act)
+    # TODO convert hipp_hid_layer_act to same shape as cort_hid_layer_act
+    cort_upper_layer_loss = aggregate(cort_upper_layer_loss, mode='mean') # mean loss across all batches
+    # get the gradient of a loss function with respect to these parameters
+    cort_grads = theano.grad(cort_upper_layer_loss, wrt=cort_l3_params)
+    # using built in stochasitc gradient descent 'sgd'
+    # in below function, this will 'update' the network
+    cort_updates = lasagne.updates.adam(cort_loss, cort_params, LEARN_RATE)
+    return cort_updates
+
+def run_cort_network():
+    # executing the function that pushes input data (x) through the system using
+    # equation defined by Y, Y then becomes the actual output, ie output layer
+    # activations.  also grabbing hidden layer activations for hamming distance
+    # last variable allows lasagne to automatically downcast any higher bit dtype
+    # to a lower dtype, a float64 to a float32 for example
+    func_feed_forward_cort_net = theano.function([X_data],
+                                                [cort_out_layer_act,
+                                                 cort_hid_layer_act],
+                                                allow_input_downcast=True)
+    # function for error backpropagation and updating the network paramters
+    func_update_cort_net = theano.function([X_data],
+                                        [cort_out_layer_act,
+                                         cort_hid_layer_act],
+                                        updates=cort_updates,
+                                        allow_input_downcast=True)
 
 
 if __name__ == __main__:
@@ -149,3 +201,6 @@ if __name__ == __main__:
                                         NUM_OF_CS,
                                         NUM_OF_CONTEXT)
     output_targets = create_targets(input_vector)
+    # TODO run individual functions for everything
+    # TODO build hipp network, build cort network, then train both,
+    # TODO then run both
