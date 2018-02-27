@@ -6,11 +6,7 @@ created on: 11/21/17
 this file houses functions specific to the network
 """
 import theano
-import theano.tensor as T
-import numpy as np
 import lasagne
-from nn_proj_utils import create_input_vector, create_targets
-import matplotlib.pyplot as plt
 
 def build_cort_network(input_vector_variable):
     """
@@ -31,14 +27,17 @@ def build_cort_network(input_vector_variable):
     """
     # the input layer expects a 15 element vector, batch size is inconsequential
     #  input vector equals the defined tensor variable above, a matrix like dtype
-    l1 = lasagne.layers.InputLayer(shape=(None, 15), input_var=input_vector_variable)
+    l1 = lasagne.layers.InputLayer(shape=(None, 15),
+                                   input_var=input_vector_variable)
     # hidden layer has 40 units and rectifier activation function equivalent to
     # f(x) = max(0, x) where x is the input to the neuron
-    l2 = lasagne.layers.DenseLayer(l1, num_units=40, nonlinearity=lasagne.rectify)
+    l2 = lasagne.layers.DenseLayer(l1, num_units=40,
+                                   nonlinearity=lasagne.nonlinearities.rectify)
     # output layer with 1 unit and sigmoid activation function to limit output
     # to values between 1 and 0, sigmoid funcion is defined as
     # f(x) = 1 / 1 + e**-x
-    l3 = lasagne.layers.DenseLayer(l2, num_units=1, nonlinearity=lasagne.sigmoid)
+    l3 = lasagne.layers.DenseLayer(l2, num_units=1,
+                                   nonlinearity=lasagne.nonlinearities.sigmoid)
     # function that defines how data show move through the network
     network_output = lasagne.layers.get_output(l3)
     # begin to gather paramters to update with loss/error function
@@ -78,25 +77,29 @@ def define_network_updates(network_targets,
     # calculating loss based on cross entropy of actual output vs targets
     # binary cross entropy is the industry standard loss function for binary
     # classification
-    loss = lasagne.binary_crossentropy(network_output, network_targets)
+    loss = lasagne.objectives.binary_crossentropy(network_output,
+                                                  network_targets)
     # calculating the mean of all loss calculations for the batch size
-    loss = lasagne.aggregate(loss, mode='mean')
+    loss = lasagne.objectives.aggregate(loss,
+                                        mode='mean')
     # compute the derivative of loss with regards to the network_parameters
     # this is used in the following formula to update the netwrok parameters
-    gradients = theano.grad(loss, wrt=network_parameters)
+    # gradients = theano.grad(loss, wrt=network_parameters)
     # create a return value to pass to the run_network function
     # updates contains the necessary updates to the network parameters based
     # backward propagation
-    updates = lasagne.updates.adam(loss, network_parameters, learning_rate)
-    return updates
+    updates = lasagne.updates.adam(loss,
+                                   network_parameters,
+                                   learning_rate)
+    return updates, loss
 
 
 def run_network(input_vector_variable,
                 output_formula,
                 network_updates,
                 actual_input_data,
-                batches=1,
-                loss):
+                loss,
+                batches=1,):
     """
     defining and running 2 functions that :: 1) feed information
     forward through the network (func_feed_data_through_nn), 2) update the
@@ -114,17 +117,20 @@ def run_network(input_vector_variable,
     """
     func_feed_data_through_nn = theano.function([input_vector_variable],
                                                 output_formula,
-                                                allow_input_downcast=True)
+                                                allow_input_downcast=True,
+                                                on_unused_input='ignore',)
     func_update_network = theano.function([input_vector_variable],
-                                            [output_formula, loss]
-                                            updates=network_updates
-                                            allow_input_downcast=True)
+                                            [output_formula, loss],
+                                            updates=network_updates,
+                                            allow_input_downcast=True,
+                                            on_unused_input='ignore',)
     network_loss_per_batch_list = []
     network_output_per_batch_list = []
+    network_loss_per_batch_variable = []
+    network_output_per_batch_variable = []
     for item in range(batches):
         func_feed_data_through_nn(actual_input_data)
-        network_output_per_trial_list,
-        netowrk_loss_per_trial_list = func_update_network(data)
+        network_output_per_batch_variable, network_loss_per_batch_variable = func_update_network(actual_input_data)
         network_output_per_batch_list.append(network_output_per_batch_variable)
         network_loss_per_batch_list.append(network_loss_per_batch_variable)
     return network_loss_per_batch_list, network_output_per_batch_list

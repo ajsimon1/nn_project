@@ -1,0 +1,9 @@
+when the unzeroed out network runs there are 2 normal troughs,
+
+the one that zeroes out the net then another on the wAY UP
+
+why would there be 2 dips on the way up?
+  
+can i use the output of hipp netowork hidden layer as wegihts to the cort network middle layer????
+
+its 1 to many, need to find that function

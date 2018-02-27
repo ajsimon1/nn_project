@@ -30,20 +30,20 @@ def accept_user_input():
     Function to accept user input for the network.  User input translated into
     CONSTANTS for the network, which I realize is slightly illogical
     """
-    num_of_cs = input('How many CS elements would you like to in ' +
-                        'the input vector: ')
-    num_of_context = input('How many context elements would you like' +
-                            ' in the input vector: ')
-    num_of_batches = input('How many batches would you like to run ' +
-                            'per trial: ')
-    num_of_trials = input('How many trials you like to run: ')
-    learning_rate = input('What should the learning rate for the network ' +
-                            'be: ')
-    return num_of_cs,
-            num_of_context,
-            num_of_batches,
-            num_of_trials,
-            learning_rate
+    num_of_cs = int(input('How many CS elements would you like to in ' +
+                        'the input vector: ')) # self explanatory
+    num_of_context = int(input('How many context elements would you like' +
+                            ' in the input vector: ')) # self explanatory
+    num_of_batches = int(input('How many batches would you like to run ' +
+                            'per trial: ')) # total runs (100 or 200)
+    num_of_trials = int(input('How many trials you like to run: '))
+    learning_rate = float(input('What should the learning rate for the ' +
+                            'network be: ')) # total runs per run (25)
+    return (num_of_cs,
+                num_of_context,
+                num_of_batches,
+                num_of_trials,
+                learning_rate,)
 
 def user_help():
     print("Welcome to the help page")
@@ -97,6 +97,7 @@ def create_targets(input_vector):
             targets.append([0.0])
     return np.asarray(targets)
 
-def create_training_vector(num_of_batches, num_elem_in_cs, num_of_context):
-    training_vector = np.zeros((num_of_batches, num_of_cs + num_of_context))
-    return training_vector
+def create_init_vector(num_of_batches, num_elem_in_cs, num_of_context):
+    init_vector = np.zeros((int(num_of_batches), 
+                                int(num_elem_in_cs) + int(num_of_context)))
+    return init_vector

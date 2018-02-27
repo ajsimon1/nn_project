@@ -10,12 +10,13 @@ import theano
 import theano.tensor as T
 import numpy as np
 import lasagne
-from lasagne.nonlinearities import sigmoid, rectify
 from lasagne.objectives import binary_crossentropy, aggregate
 from DEPRECATED_nn_proj_utils import create_input_vector, create_targets
 import pprint
 import matplotlib.pyplot as plt
 
+np.set_printoptions(threshold=np.nan)
+pp = pprint.PrettyPrinter()
 # define variables
 # data = input to the network
 # targets = what the expected output is per data/input
@@ -57,23 +58,26 @@ targets = create_targets(data)
 l1 = lasagne.layers.InputLayer(shape=(None, 15), input_var=X_data)
 # hidden layer has 40 units and rectifier activation function equivalent to
 # f(x) = max(0, x) where x is the input to the neuron
-l2 = lasagne.layers.DenseLayer(l1, num_units=40, nonlinearity=rectify)
+l2 = lasagne.layers.DenseLayer(l1, num_units=40,
+                               nonlinearity=lasagne.nonlinearities.rectify)
 # output layer with 1 unit and sigmoid activation function to limit output
 # to values between 1 and 0, sigmoid funcion is defined as
 # f(x) = 1 / 1 + e**-x
-l3 = lasagne.layers.DenseLayer(l2, num_units=1, nonlinearity=sigmoid)
+l3 = lasagne.layers.DenseLayer(l2, num_units=1,
+                               nonlinearity=lasagne.nonlinearities.sigmoid)
 
 # function that defines how data show move through the network
-predictions = lasagne.layers.get_output(l3)
+output_layer_activation = lasagne.layers.get_output(l3)
 # formula for above:
 # 'sigmoid((((TensorConstant{0.5} * (((input \\dot W) + b) +
 # |((input \\dot W) + b)|)) \\dot W) + b))'
+hidden_layer_activation = lasagne.layers.get_output(l2)
 # executing the function that pushes input data (x) through the system using
 # equation defined by Y, Y then becomes the actual output
 # last variable allows lasagne to automatically downcast any higher bit dtype
 # to a lower dtype, a float64 to a float32 for example
 func_feed_data_through_nn = theano.function([X_data],
-                                            predictions,
+                                            output_layer_activation,
                                             allow_input_downcast=True)
 # test function was fn(np.random.randn(3, 784)) where 3 is batches
 # and 784 is first layer input
@@ -86,9 +90,9 @@ func_feed_data_through_nn = theano.function([X_data],
 # going backwards to input will be gathered also
 params = lasagne.layers.get_all_params(l3, trainable=True)
 
-# predictions = actual output of the network, i.e. what output is
+# output_layer_activation = actual output of the network, i.e. what output is
 # targets is the supervised output, i.e. what output should be
-loss = binary_crossentropy(predictions, targets)
+loss = binary_crossentropy(output_layer_activation, targets)
 loss = aggregate(loss, mode='mean') # mean of loss across all NUM_OF_BATCHES
 
 # get the gradient of a loss function with respect to these parameters
@@ -106,44 +110,44 @@ updates = lasagne.updates.adam(loss, params, learning_rate)
 # the predictions of every trial in the batch
 # ie every feed forward gets a backpropagation
 # TODO pick up ###===HERE===###
-predictions_list = []
 func_update_network = theano.function([X_data],
-                                    predictions,
+                                    output_layer_activation,
                                     updates=updates,
                                     allow_input_downcast=True)
-master_predictions_list = []
 
-# remember to load all context first (zeroes) to get over that initial
-# dowards trend towards 0
-train_vec = np.zeros((num_of_batches, num_of_cs + num_of_context))
+predictions_list = []
+master_predictions_list = []
+another_list = []
+new_list = []
+cs_output_list = []
+
 for epoch in range(NUM_OF_BATCHES):
     func_feed_data_through_nn(data)
     predictions_list = func_update_network(data)
     master_predictions_list.append(predictions_list)
 
-another_list = []
-
 for item in master_predictions_list:
     for a_item in item:
         another_list.append(float(a_item))
 counter = 0
-new_list = []
+
 while counter < len(another_list):
     new_list.append(another_list[counter:counter+NUM_OF_TRIALS])
     counter += NUM_OF_TRIALS
 
 cs_index = np.where(targets==1.)
 
-cs_output_list = []
-
 for item in new_list:
     cs_output_list.append(item[int(cs_index[0])])
 input_output = list(zip(list(data), list(targets)))
 
-pp = pprint.PrettyPrinter()
-pp.pprint(cs_output_list)
-
+pp.pprint(new_list)
+pp.pprint(another_list)
+# pp.pprint(cs_output_list)
+# print(len(cs_output_list))
+'''
 plt.plot(cs_output_list)
 plt.ylabel('Final Output')
 plt.xlabel('Trial #')
 plt.show()
+'''

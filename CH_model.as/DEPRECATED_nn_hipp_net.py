@@ -28,12 +28,10 @@ NUM_OF_CS = 5 # the variable conditioned stimuls coupled with the context
 NUM_OF_CONTEXT = 10 # the immutable context that reflects the 'environment'
 # CS & CONTEXT are combined to equal an 'input vector'
 NUM_OF_TRIALS = 1 # trial is a collection of input vector
-NUM_OF_BATCHES = 100 # batch is a collection of trials
+NUM_OF_BATCHES = 250 # batch is a collection of trials
 LEARNING_RATE = 0.1 # learning rate to update the network after error backprop
 
 data = create_input_vector(NUM_OF_TRIALS, NUM_OF_CS, NUM_OF_CONTEXT)
-
-targets = create_targets(data)
 
 input_layer = lasagne.layers.InputLayer(shape=(None, 15), input_var=X_data)
 
@@ -53,9 +51,9 @@ loss = lasagne.objectives.squared_error(input_layer.input_var, network_output).m
 updates = lasagne.updates.adadelta(loss, params, rho=0.5, learning_rate = LEARNING_RATE)
 
 updates = lasagne.updates.apply_momentum(updates, params=params)
-
-train = theano.function([X_data], network_output, updates=updates)
-
+# train = update in actual
+train = theano.function([X_data], network_output, updates=updates, allow_input_downcast=True)
+# predict = feed forward in actual
 predict = theano.function([X_data], network_output, allow_input_downcast=True)
 
 encode = theano.function([X_data], hidden_layer_output, allow_input_downcast=True)
@@ -63,11 +61,10 @@ encode = theano.function([X_data], hidden_layer_output, allow_input_downcast=Tru
 net_output_list = []
 encoded_output_list = []
 
-# is it a brand new network everytime?
 
 for epoch in range(NUM_OF_BATCHES):
-    predict(data)
-    net_output = train(data)
+    predict(data) # feed forward
+    net_output = train(data) # update
     net_output_list.append(net_output)
 
 zip_input_putput = list(zip(data, net_output_list))
