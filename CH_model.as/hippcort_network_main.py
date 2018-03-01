@@ -27,9 +27,9 @@ pp = pprint.PrettyPrinter()
 # define constants
 NUM_OF_CS = 5
 NUM_OF_CONTEXT = 10
-NUM_OF_TRIALS = 250 # note this does not match previous nn_proj_main
-NUM_OF_BATCHES = 20 # note this does not match previous nn_proj_main
-LEARN_RATE = 0.1
+NUM_OF_EPOCHS = 250
+NUM_OF_BATCHES = 20
+LEARNING_RATE = 0.1
 
 X_data = T.matrix('X_data')
 Y_targets = T.matrix('Y_targets') # TODO, you dont use this anywhere
@@ -130,41 +130,41 @@ def build_hipp_network(X_data):
                                             num_units=15,
                                             nonlinearity=lasagne.nonlinearities.sigmoid)
 
-    hipp_hid_layer_act, hipp_out_layer_act = lasagne.layers.get_output([hipp_l2,
-                                                                        hipp_l3])
+    hipp_hid_layer_formula, hipp_out_layer_formula = lasagne.layers.get_output([hipp_l2,
+                                                                                hipp_l3])
     HippNetDetails = namedtuple('HippNetDetails', [
                                             'input_layer',
                                             'hidden_layer',
                                             'output_layer',
-                                            'hidden_layer_activation',
-                                            'output_layer_activation',
+                                            'hidden_layer_formula',
+                                            'output_layer_formula',
                                             ])
     return HippNetDetails(hipp_l1,
                           hipp_l2,
                           hipp_l3,
-                          hipp_hid_layer_act,
-                          hipp_out_layer_act)
+                          hipp_hid_layer_formula,
+                          hipp_out_layer_formula)
 
-def build_updates_hipp_network(hipp_l1, hipp_l3, hipp_out_layer_act, cs_index):
+def build_updates_hipp_network(hipp_l1, hipp_l3, hipp_out_layer_formula, cs_index, learning_rate=LEARNING_RATE):
     hipp_params = lasagne.layers.get_all_params(hipp_l3, trainable=True)
     hipp_loss = lasagne.objectives.squared_error(hipp_l1.input_var[cs_index],
-                                                hipp_out_layer_act).mean()
+                                                hipp_out_layer_formula).mean()
     hipp_updates = lasagne.updates.adadelta(hipp_loss,
                                             hipp_params,
                                             rho=0.75,
-                                            learning_rate = LEARN_RATE)
+                                            learning_rate = learning_rate)
     hipp_updates = lasagne.updates.apply_momentum(hipp_updates,
                                                     params=hipp_params)
     return hipp_updates
 
-def build_functions_hipp_network(X_data, hipp_out_layer_act, hipp_hid_layer_act, hipp_updates):
+def build_functions_hipp_network(X_data, hipp_out_layer_formula, hipp_hid_layer_formula, hipp_updates):
     func_feed_forward_hipp_net = theano.function([X_data],
-                                                hipp_out_layer_act,
+                                                hipp_out_layer_formula,
                                                 allow_input_downcast=True)
 
     func_update_hipp_net = theano.function([X_data],
-                                            [hipp_out_layer_act,
-                                            hipp_hid_layer_act],
+                                            [hipp_out_layer_formula,
+                                            hipp_hid_layer_formula],
                                             updates=hipp_updates,
                                             allow_input_downcast=True)
     return func_feed_forward_hipp_net, func_update_hipp_net
@@ -172,7 +172,7 @@ def build_functions_hipp_network(X_data, hipp_out_layer_act, hipp_hid_layer_act,
 # #############################################################################
 # ##################### build cortical networks ###############################
 # #############################################################################
-def build_cort_network(X_data, net_type='i'):
+def build_cort_network(X_data):
     cort_l1 = lasagne.layers.InputLayer(shape=(None, 15),
                                        input_var=X_data,
                                        W=Constant(0.0),
@@ -181,44 +181,72 @@ def build_cort_network(X_data, net_type='i'):
                                    nonlinearity=lasagne.nonlinearities.rectify)
     cort_l3 = lasagne.layers.DenseLayer(cort_l2, num_units=1,
                                    nonlinearity=lasagne.nonlinearities.sigmoid)
-    cort_hid_layer_act, cort_out_layer_act = lasagne.layers.get_output([cort_l2,
-                                                                        cort_l3])
-    return cort_hid_layer_act, cort_out_layer_act
+    cort_hid_layer_formula, cort_out_layer_formula = lasagne.layers.get_output([cort_l2,
+                                                                                cort_l3])
+    CortNetDetails = namedtuple('CortNetDetails', [
+                                                    'input_layer',
+                                                    'hidden_layer',
+                                                    'output_layer',
+                                                    'hidden_layer_formula',
+                                                    'output_layer_formula',
+                                                    ])
+    return CortNetDetails(cort_l1,
+                          cort_l2,
+                          cort_l3,
+                          cort_hid_layer_formula,
+                          cort_out_layer_formula)
 
-def train_cort_network():
-    # TODO add a parameter for 'intact' or 'lesion' to drive a logic statement
-    # remove trainable tag so that lower layer weights are not trained
+def build_updates_upper_cort_network(cort_l2, cort_l3, targets, cort_out_lay_formula, learning_rate=LEARNING_RATE):
     cort_l2.params[cort_l2.W].remove('trainable')
     cort_l2.params[cort_l2.b].remove('trainable')
     # get the parameters, trainable=True only returns parameters that can be trained
     cort_l3_params = lasagne.layers.get_all_params(cort_l3, trainable=True)
     # output_layer_activation = actual output of the network, i.e. what output is
     # targets is the supervised output, i.e. what output should be
-    cort_upper_layer_loss = binary_crossentropy(cort_out_layer_act, targets)
-    cort_lower_layer_loss = binary_crossentropy(cort_hid_layer_act,
-                                                hipp_hid_layer_act)
-    # TODO convert hipp_hid_layer_act to same shape as cort_hid_layer_act
+    cort_upper_layer_loss = binary_crossentropy(cort_out_lay_formula, targets)
     cort_upper_layer_loss = aggregate(cort_upper_layer_loss, mode='mean')
-    cort_grads = theano.grad(cort_upper_layer_loss, wrt=cort_l3_params)
-    cort_updates = lasagne.updates.adam(cort_loss, cort_params, LEARN_RATE)
-    return cort_updates
+    cort_upper_grads = theano.grad(cort_upper_layer_loss, wrt=cort_l3_params)
+    cort_upper_layer_updates = lasagne.updates.adam(cort_upper_layer_loss,
+                                                    cort_l3_params,
+                                                    learning_rate=learning_rate)
+    return cort_upper_layer_updates
 
-def run_cort_network():
+def build_updates_lower_cort_network(cort_l2, hipp_hid_layer_act, cort_hid_lay_formula, learning_rate=LEARNING_RATE):
+    cort_l2_params = lasagne.layers.get_all_params(cort_l2, trainable=True)
+    one_to_many_hipp_hid_layer_act = hipp_hid_layer_act[0] * 5
+    cort_lower_layer_loss = binary_crossentropy(cort_hid_lay_formula,
+                                                one_to_many_hipp_hid_layer_act)
+    cort_lower_layer_loss = aggregate(cort_lower_layer_loss, mode='mean')
+    cort_lower_grads = theano.grad(cort_lower_layer_loss, wrt=cort_l2_params)
+    cort_lower_layer_updates = lasagne.updates.adam(cort_lower_layer_loss,
+                                                    cort_l2_params,
+                                                    learning_rate=learning_rate)
+    return cort_lower_layer_updates
+def build_functions_cort_network(X_data, cort_out_layer_formula, cort_hid_layer_formula, cort_upper_updates, cort_lower_updates):
     func_feed_forward_cort_net = theano.function([X_data],
-                                                [cort_out_layer_act,
-                                                 cort_hid_layer_act],
+                                                [cort_out_layer_formula,
+                                                 cort_hid_layer_formula],
                                                 allow_input_downcast=True)
-    func_update_cort_net = theano.function([X_data],
-                                        [cort_out_layer_act,
-                                         cort_hid_layer_act],
-                                        updates=cort_updates,
-                                        allow_input_downcast=True)
+    func_update_cort_upper_net = theano.function([X_data],
+                                                 [cort_out_layer_formula],
+                                                 updates=cort_upper_updates,
+                                                 allow_input_downcast=True)
+    func_update_cort_lower_net = theano.function([X_data],
+                                                 [cort_hid_layer_formula],
+                                                 updates=cort_lower_updates,
+                                                 allow_input_downcast=True)
+    return func_feed_forward_cort_net, func_update_cort_upper_net, func_update_cort_lower_net
 
 # #############################################################################
 # ##################### build funcs to run networks ###########################
 # #############################################################################
-
-
+def run_hipp_network(num_of_epochs, feed_forward_func, backprop_func, input_vector):
+    for epoch in range(num_of_epochs):
+        feed_forward_func(input_vector)
+        hipp_raw_batch_out_act, hipp_raw_batch_hid_act = backprop_func(input_vector)
+        hipp_net_raw_output_list.append(hipp_raw_batch_out_act)
+        hipp_net_raw_hidden_list.append(list(hipp_raw_batch_hid_act))
+    return hipp_net_raw_output_list, hipp_net_raw_hidden_list
 
 if __name__ == '__main__':
     network_type = gather_input_from_user()
@@ -230,22 +258,41 @@ if __name__ == '__main__':
     hipp_net_details = build_hipp_network(X_data)
     hipp_net_updates = build_updates_hipp_network(hipp_net_details.input_layer,
                                                   hipp_net_details.output_layer,
-                                                  hipp_net_details.output_layer_activation,
-                                                  int(cs_index[0]))
+                                                  hipp_net_details.output_layer_formula,
+                                                  int(cs_index[0]),
+                                                  learning_rate=LEARNING_RATE)
     func_feed_forward_hipp_net, func_update_hipp_net = build_functions_hipp_network(X_data,
-                                                        hipp_net_details.output_layer_activation,
-                                                        hipp_net_details.hidden_layer_activation,
+                                                        hipp_net_details.output_layer_formula,
+                                                        hipp_net_details.hidden_layer_formula,
                                                         hipp_net_updates)
-    for epoch in range(NUM_OF_TRIALS):
-        func_feed_forward_hipp_net(input_vector)
-        hipp_raw_batch_out_act, hipp_raw_batch_hid_act = func_update_hipp_net(input_vector)
-        hipp_net_raw_output_list.append(hipp_raw_batch_out_act)
-        hipp_net_raw_hidden_list.append(list(hipp_raw_batch_hid_act))
-
-    # TODO run individual functions for everything
-    # TODO build hipp network, build cort network, then train both,
-    # TODO then run both
+    cort_net_details = build_cort_network(X_data)
+    cort_upper_updates = build_updates_upper_cort_network(cort_net_details.hidden_layer,
+                                                         cort_net_details.output_layer,
+                                                         input_vector,
+                                                         cort_net_details.output_layer_formula,
+                                                         learning_rate=LEARNING_RATE)
+    cort_lower_updates = build_updates_lower_cort_network(cort_net_details.hidden_layer,
+                                                         hipp_net_details.hidden_layer_formula,
+                                                         cort_net_details.hidden_layer_formula,
+                                                         learning_rate=LEARNING_RATE)
+    func_feed_forward_cort_net, func_update_cort_upper_net, func_update_cort_lower_net = build_functions_cort_network(X_data,
+                                                                                                                     cort_net_details.output_layer_formula,
+                                                                                                                     cort_net_details.hidden_layer_formula,
+                                                                                                                     cort_upper_updates,
+                                                                                                                     cort_lower_updates)
+    hipp_net_raw_output_list, hipp_net_raw_hidden_list = run_hipp_network(NUM_OF_EPOCHS,
+                                                                          func_feed_forward_hipp_net,
+                                                                          func_update_hipp_net,
+                                                                          input_vector)
+    # TODO hey man, the run_hipp net works, do the same for CORTICAL!!!!!!                                                                          
     pp.pprint(hipp_net_raw_output_list)
     print(input_vector)
     print(output_targets)
     print(cs_index[0])
+    '''
+    for epoch in range(NUM_OF_EPOCHS):
+        func_feed_forward_hipp_net(input_vector)
+        hipp_raw_batch_out_act, hipp_raw_batch_hid_act = func_update_hipp_net(input_vector)
+        hipp_net_raw_output_list.append(hipp_raw_batch_out_act)
+        hipp_net_raw_hidden_list.append(list(hipp_raw_batch_hid_act))
+    '''
