@@ -197,8 +197,10 @@ final_data = {'X':cort_net_us_absent_output_list,
 # dump output into dataframe
 network_output_df = pd.DataFrame(final_data, columns=final_data.keys())
 # print(int(cs_index[0]))
-# print(network_output_df)
+print(network_output_df)
 # pp.pprint(hipp_net_raw_output_list)
 # print(data)
 # pp.pprint(hipp_net_raw_hidden_list[0][24])
 # network_output_df.loc[:].plot()
+print(cort_out_layer_act)
+print(cort_hid_layer_act)
