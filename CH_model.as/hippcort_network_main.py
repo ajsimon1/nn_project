@@ -28,7 +28,7 @@ pp = pprint.PrettyPrinter()
 NUM_OF_CS = 5
 NUM_OF_CONTEXT = 10
 NUM_OF_EPOCHS = 250
-NUM_OF_BATCHES = 20
+NUM_OF_BATCHES = 25
 LEARNING_RATE = 0.1
 
 X_data = T.matrix('X_data')
@@ -147,8 +147,8 @@ def build_hipp_network(X_data):
 
 def build_updates_hipp_network(hipp_l1, hipp_l3, hipp_out_layer_formula, cs_index, learning_rate=LEARNING_RATE):
     hipp_params = lasagne.layers.get_all_params(hipp_l3, trainable=True)
-    hipp_loss = lasagne.objectives.squared_error(hipp_l1.input_var[cs_index],
-                                                hipp_out_layer_formula).mean()
+    hipp_loss = lasagne.objectives.squared_error(hipp_out_layer_formula,
+                                                hipp_l1.input_var[cs_index]).mean()
     hipp_updates = lasagne.updates.adadelta(hipp_loss,
                                             hipp_params,
                                             rho=0.75,
@@ -198,10 +198,10 @@ def build_cort_network(X_data):
                           cort_out_layer_formula)
 
 def build_updates_upper_cort_network(cort_l2, cort_l3, targets, cort_out_lay_formula, learning_rate=LEARNING_RATE):
-    cort_l2.params[cort_l2.W].remove('trainable')
-    cort_l2.params[cort_l2.b].remove('trainable')
+    # cort_l2.params[cort_l2.W].remove('trainable')
+    # cort_l2.params[cort_l2.b].remove('trainable')
     # get the parameters, trainable=True only returns parameters that can be trained
-    cort_l3_params = lasagne.layers.get_all_params(cort_l3, trainable=True)
+    cort_l3_params = lasagne.layers.get_all_params([cort_l3], trainable=True)
     # output_layer_activation = actual output of the network, i.e. what output is
     # targets is the supervised output, i.e. what output should be
     cort_upper_layer_loss = binary_crossentropy(cort_out_lay_formula, targets)
@@ -215,6 +215,9 @@ def build_updates_upper_cort_network(cort_l2, cort_l3, targets, cort_out_lay_for
 def build_updates_lower_cort_network(cort_l2, hipp_hid_layer_act, cort_hid_lay_formula, learning_rate=LEARNING_RATE):
     cort_l2_params = lasagne.layers.get_all_params(cort_l2, trainable=True)
     one_to_many_hipp_hid_layer_act = hipp_hid_layer_act[0] * 5
+    print(cort_l2_params)
+    print(hipp_hid_layer_act)
+    print(one_to_many_hipp_hid_layer_act)
     cort_lower_layer_loss = binary_crossentropy(cort_hid_lay_formula,
                                                 one_to_many_hipp_hid_layer_act)
     cort_lower_layer_loss = aggregate(cort_lower_layer_loss, mode='mean')
@@ -254,11 +257,10 @@ def run_intact_cort_network(num_of_epochs, feed_forward_func, lower_backprop_fun
     for epoch in range(num_of_epochs):
         feed_forward_func(input_vector)
         cort_raw_batch_hidden_activation = lower_backprop_func(input_vector)
-        (cort_raw_batch_output_activation,
-        cort_raw_batch_hidden_activation) = upper_backprop_func(input_vector)
-        cort_net_raw_output_list.append(cort_raw_batch_output_activation)
+        # cort_raw_batch_output_activation = upper_backprop_func(input_vector)
+        # cort_net_raw_output_list.append(cort_raw_batch_output_activation)
         cort_net_raw_hidden_list.append(list(cort_raw_batch_hidden_activation))
-    return cort_net_raw_output_list, cort_net_raw_hidden_list
+    return cort_net_raw_hidden_list
 
 def run_lesion_cort_network(num_of_epochs, feed_forward_func, upper_backprop_func, input_vector):
     for epoch in range(num_of_epochs):
@@ -275,6 +277,7 @@ if __name__ == '__main__':
                                         NUM_OF_CONTEXT)
     output_targets = create_targets(input_vector)
     cs_index = np.where(output_targets==1.)
+
     hipp_net_details = build_hipp_network(X_data)
     hipp_net_updates = build_updates_hipp_network(hipp_net_details.input_layer,
                                                   hipp_net_details.output_layer,
@@ -303,38 +306,16 @@ if __name__ == '__main__':
                                                                 cort_net_details.hidden_layer_formula,
                                                                 cort_upper_updates,
                                                                 cort_lower_updates)
-    print(cort_net_details.output_layer_formula)
-    print(cort_net_details.hidden_layer_formula)
-    if network_type == 'l':
-        # print(input_vector)
-        cort_net_raw_output_list = run_lesion_cort_network(NUM_OF_EPOCHS,
+    cort_net_raw_output_list = run_lesion_cort_network(NUM_OF_EPOCHS,
                                                              func_feed_forward_cort_net,
                                                              func_update_cort_upper_net,
                                                              input_vector)
-    elif network_type == 'i':
-        (hipp_net_raw_output_list,
-         hipp_net_raw_hidden_list) = run_hipp_network(NUM_OF_EPOCHS,
-                                                      func_feed_forward_hipp_net,
-                                                      func_update_hipp_net,
-                                                      input_vector)
-        (cort_net_raw_output_list,
-         cort_net_raw_hidden_list) = run_intact_cort_network(NUM_OF_EPOCHS,
-                                                             func_feed_forward_cort_net,
-                                                             func_update_cort_lower_net,
-                                                             func_update_cort_upper_net,
-                                                             input_vector)
-    elif network_type == 's':
 
-        (hipp_net_raw_output_list,
-         hipp_net_raw_hidden_list) = run_hipp_network(NUM_OF_EPOCHS,
-                                                       func_feed_forward_hipp_net,
-                                                       func_update_hipp_net,
-                                                       input_vector)
 
     # TODO hey man, the run_hipp net works, do the same for CORTICAL!!!!!!
-    pp.pprint(cort_net_raw_output_list)
-    pp.pprint(cort_net_raw_hidden_list)
-    pp.pprint(hipp_net_raw_output_list)
-    print(input_vector)
-    print(output_targets)
-    print(cs_index[0])
+    # pp.pprint(cort_net_raw_output_list)
+    # pp.pprint(cort_net_raw_hidden_list)
+    # pp.pprint(hipp_net_raw_output_list)
+    # print(input_vector)
+    # print(output_targets)
+    # print(cs_index[0])
