@@ -197,49 +197,27 @@ def build_cort_network(X_data):
                           cort_hid_layer_formula,
                           cort_out_layer_formula)
 
-def build_updates_upper_cort_network(cort_l2, cort_l3, targets, cort_out_lay_formula, learning_rate=LEARNING_RATE):
-    # cort_l2.params[cort_l2.W].remove('trainable')
-    # cort_l2.params[cort_l2.b].remove('trainable')
-    # get the parameters, trainable=True only returns parameters that can be trained
-    cort_l3_params = lasagne.layers.get_all_params([cort_l3], trainable=True)
-    # output_layer_activation = actual output of the network, i.e. what output is
-    # targets is the supervised output, i.e. what output should be
-    cort_upper_layer_loss = binary_crossentropy(cort_out_lay_formula, targets)
-    cort_upper_layer_loss = aggregate(cort_upper_layer_loss, mode='mean')
-    cort_upper_grads = theano.grad(cort_upper_layer_loss, wrt=cort_l3_params)
-    cort_upper_layer_updates = lasagne.updates.adam(cort_upper_layer_loss,
-                                                    cort_l3_params,
-                                                    learning_rate=learning_rate)
-    return cort_upper_layer_updates
+def build_updates_cort_network(cort_l2, cort_l3, cort_out_layer_formula, targets):
+    cort_l2.params[cort_l2.W].remove('trainable')
+    cort_l2.params[cort_l2.b].remove('trainable')
+    cort_params = lasagne.layers.get_all_params([cort_l3], trainable=True)
+    cort_loss = binary_crossentropy(cort_out_layer_formula, targets)
+    cort_loss = aggregate(cort_loss, mode='mean')
+    cort_grads = theano.grad(cort_loss, wrt=cort_params)
+    cort_updates = lasagne.updates.adam(cort_loss,
+                                        cort_params,
+                                        learning_rate = LEARNING_RATE)
+    return cort_updates
 
-def build_updates_lower_cort_network(cort_l2, hipp_hid_layer_act, cort_hid_lay_formula, learning_rate=LEARNING_RATE):
-    cort_l2_params = lasagne.layers.get_all_params(cort_l2, trainable=True)
-    one_to_many_hipp_hid_layer_act = hipp_hid_layer_act[0] * 5
-    print(cort_l2_params)
-    print(hipp_hid_layer_act)
-    print(one_to_many_hipp_hid_layer_act)
-    cort_lower_layer_loss = binary_crossentropy(cort_hid_lay_formula,
-                                                one_to_many_hipp_hid_layer_act)
-    cort_lower_layer_loss = aggregate(cort_lower_layer_loss, mode='mean')
-    cort_lower_grads = theano.grad(cort_lower_layer_loss, wrt=cort_l2_params)
-    cort_lower_layer_updates = lasagne.updates.adam(cort_lower_layer_loss,
-                                                    cort_l2_params,
-                                                    learning_rate=learning_rate)
-    return cort_lower_layer_updates
-def build_functions_cort_network(X_data, cort_out_layer_formula, cort_hid_layer_formula, cort_upper_updates, cort_lower_updates):
+def build_functions_cort_network(X_data, cort_out_layer_formula, cort_hid_layer_formula, cort_updates):
     func_feed_forward_cort_net = theano.function([X_data],
                                                  cort_out_layer_formula,
                                                  allow_input_downcast=True)
-    func_update_cort_upper_net = theano.function([X_data],
+    func_update_cort_net = theano.function([X_data],
                                                  cort_out_layer_formula,
-                                                 updates=cort_upper_updates,
+                                                 updates=cort_updates,
                                                  allow_input_downcast=True)
-    func_update_cort_lower_net = theano.function([X_data],
-                                                 [cort_out_layer_formula,
-                                                  cort_hid_layer_formula],
-                                                 updates=cort_lower_updates,
-                                                 allow_input_downcast=True)
-    return func_feed_forward_cort_net, func_update_cort_upper_net, func_update_cort_lower_net
+    return func_feed_forward_cort_net, func_update_cort_net
 
 # #############################################################################
 # ##################### build funcs to run networks ###########################
@@ -262,7 +240,7 @@ def run_intact_cort_network(num_of_epochs, feed_forward_func, lower_backprop_fun
         cort_net_raw_hidden_list.append(list(cort_raw_batch_hidden_activation))
     return cort_net_raw_hidden_list
 
-def run_lesion_cort_network(num_of_epochs, feed_forward_func, upper_backprop_func, input_vector):
+def run_cort_network(num_of_epochs, feed_forward_func, upper_backprop_func, input_vector):
     for epoch in range(num_of_epochs):
         feed_forward_func(input_vector)
         cort_raw_batch_output_activation = upper_backprop_func(input_vector)
@@ -290,26 +268,19 @@ if __name__ == '__main__':
                                                           hipp_net_details.hidden_layer_formula,
                                                           hipp_net_updates)
     cort_net_details = build_cort_network(X_data)
-    cort_upper_updates = build_updates_upper_cort_network(cort_net_details.hidden_layer,
-                                                         cort_net_details.output_layer,
-                                                         input_vector,
-                                                         cort_net_details.output_layer_formula,
-                                                         learning_rate=LEARNING_RATE)
-    cort_lower_updates = build_updates_lower_cort_network(cort_net_details.hidden_layer,
-                                                         hipp_net_details.hidden_layer_formula,
-                                                         cort_net_details.hidden_layer_formula,
-                                                         learning_rate=LEARNING_RATE)
+    cort_updates = build_updates_cort_network(cort_net_details.hidden_layer,
+                                             cort_net_details.output_layer,
+                                             cort_net_details.output_layer_formula,
+                                             input_vector)
     (func_feed_forward_cort_net,
-     func_update_cort_upper_net,
-     func_update_cort_lower_net) = build_functions_cort_network(X_data,
-                                                                cort_net_details.output_layer_formula,
-                                                                cort_net_details.hidden_layer_formula,
-                                                                cort_upper_updates,
-                                                                cort_lower_updates)
-    cort_net_raw_output_list = run_lesion_cort_network(NUM_OF_EPOCHS,
-                                                             func_feed_forward_cort_net,
-                                                             func_update_cort_upper_net,
-                                                             input_vector)
+     func_update_cort_net) = build_functions_cort_network(X_data,
+                                                        cort_net_details.output_layer_formula,
+                                                        cort_net_details.hidden_layer_formula,
+                                                        cort_updates)
+    cort_net_raw_output_list = run_cort_network(NUM_OF_EPOCHS,
+                                                 func_feed_forward_cort_net,
+                                                 func_update_cort_net,
+                                                 input_vector)
 
 
     # TODO hey man, the run_hipp net works, do the same for CORTICAL!!!!!!
