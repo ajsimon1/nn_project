@@ -20,7 +20,8 @@ np.set_printoptions(threshold=np.nan)
 pp = pprint.PrettyPrinter()
 
 # define variables
-X_data = T.vector('X_data') # data
+# X_data = T.col('X_data') # data
+X_data = T.matrix('X_data') # data
 Y_targets = T.matrix('Y_targets') # targets
 # CONSTANTS
 NUM_OF_CS = 5 # the variable conditioned stimuls coupled with the context
@@ -42,10 +43,7 @@ cs_index = np.where(targets==1.)
 # #############################################################################
 # ##################### build cort network ####################################
 # #############################################################################
-cort_l1 = lasagne.layers.InputLayer(shape=(None,15),
-                               input_var=X_data,
-                               W=Constant(0.0),
-                               b=Constant(0.0))
+cort_l1 = lasagne.layers.InputLayer(shape=(None,15),input_var=X_data)
 # hidden layer has 40 units and rectifier activation function equivalent to
 # f(x) = max(0, x) where x is the input to the neuron
 cort_l2 = lasagne.layers.DenseLayer(cort_l1, num_units=40,
@@ -154,13 +152,10 @@ cort_net_sims_hidden_list = []
 cort_net_sims_output_list = []
 for sim in range(NUM_OF_SIMS):
     for epoch in range(NUM_OF_BATCHES):
-        for item in data:
-            func_feed_forward_cort_net(item)
-            cort_raw_output_activation, cort_raw_hidden_activation = func_update_cort_net(item)
-            cort_net_batch_output_list.append(cort_raw_output_activation)
-            cort_net_batch_hidden_list.append(cort_raw_hidden_activation)
-        cort_net_raw_output_list.append(cort_net_batch_output_list)
-        cort_net_raw_hidden_list.append(list(cort_net_batch_hidden_list))
+        func_feed_forward_cort_net(data)
+        cort_raw_output_activation, cort_raw_hidden_activation = func_update_cort_net(data)
+        cort_net_raw_output_list.append(cort_raw_output_activation)
+        cort_net_raw_hidden_list.append(list(cort_raw_hidden_activation))
     cort_net_sims_hidden_list.append(cort_net_raw_hidden_list)
     cort_net_sims_output_list.append(cort_net_raw_output_list)
 
