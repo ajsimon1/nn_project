@@ -43,7 +43,10 @@ cs_index = np.where(targets==1.)
 # #############################################################################
 # ##################### build cort network ####################################
 # #############################################################################
-cort_l1 = lasagne.layers.InputLayer(shape=(None,15),input_var=X_data)
+cort_l1 = lasagne.layers.InputLayer(shape=(None,15),
+                                    input_var=X_data,
+                                    W=Constant(0.0),
+                                    b=Constant(0.0))
 # hidden layer has 40 units and rectifier activation function equivalent to
 # f(x) = max(0, x) where x is the input to the neuron
 cort_l2 = lasagne.layers.DenseLayer(cort_l1, num_units=40,
@@ -76,7 +79,7 @@ func_feed_forward_cort_net = theano.function([X_data],
 cort_params = lasagne.layers.get_all_params([cort_l3], trainable=True)
 # output_layer_activation = actual output of the network, i.e. what output is
 # targets is the supervised output, i.e. what output should be
-cort_loss = binary_crossentropy(cort_out_layer_act, targets[cs_index[0]])
+cort_loss = binary_crossentropy(cort_out_layer_act, targets)
 # TODO cort_loss = binary_crossentropy(cort_hid_layer_act, hipp_hid_layer_act)
 # TODO convert hipp_hid_layer_act to same shape as cort_hid_layer_act
 cort_loss = aggregate(cort_loss, mode='mean') # mean loss across all batches
@@ -84,7 +87,7 @@ cort_loss = aggregate(cort_loss, mode='mean') # mean loss across all batches
 cort_grads = theano.grad(cort_loss, wrt=cort_params)
 # using built in stochasitc gradient descent 'sgd'
 # in below function, this will 'update' the network
-cort_updates = lasagne.updates.adam(cort_loss, cort_params, learning_rate=0.5)
+cort_updates = lasagne.updates.adam(cort_loss, cort_params, learning_rate=0.01)
 # function for error backpropagation and updating the network paramters
 func_update_cort_net = theano.function([X_data],
                                     [cort_out_layer_act,
@@ -94,7 +97,10 @@ func_update_cort_net = theano.function([X_data],
 # #############################################################################
 # ##################### build hipp network ####################################
 # #############################################################################
-hipp_l1 = lasagne.layers.InputLayer(shape=(None, 15), input_var=X_data)
+hipp_l1 = lasagne.layers.InputLayer(shape=(None, 15),
+                                    input_var=X_data,
+                                    W=Constant(0.0),
+                                    b=Constant(0.0))
 
 hipp_l2 = lasagne.layers.DenseLayer(hipp_l1,
                                         num_units=8,
@@ -129,11 +135,11 @@ func_update_hipp_net = theano.function([X_data],
 # ############################################################################
 # ######################### run hipp network #################################
 # ############################################################################
-hipp_net_raw_output_list = []
-hipp_net_raw_hidden_list = []
 hipp_net_sims_output_list = []
 hipp_net_sims_hidden_list = []
 for sim in range(NUM_OF_SIMS):
+    hipp_net_raw_hidden_list = []
+    hipp_net_raw_output_list = []
     for epoch in range(NUM_OF_BATCHES):
         func_feed_forward_hipp_net(data)
         hipp_raw_batch_out_act, hipp_raw_batch_hid_act = func_update_hipp_net(data)
@@ -146,11 +152,11 @@ for sim in range(NUM_OF_SIMS):
 # ############################################################################
 cort_net_batch_output_list = []
 cort_net_batch_hidden_list = []
-cort_net_raw_output_list = []
-cort_net_raw_hidden_list = []
 cort_net_sims_hidden_list = []
 cort_net_sims_output_list = []
 for sim in range(NUM_OF_SIMS):
+    cort_net_raw_output_list = []
+    cort_net_raw_hidden_list = []
     for epoch in range(NUM_OF_BATCHES):
         func_feed_forward_cort_net(data)
         cort_raw_output_activation, cort_raw_hidden_activation = func_update_cort_net(data)
@@ -175,19 +181,18 @@ cort_net_us_present_hidden_layer_activations_list = []
 cort_net_us_absent_hidden_layer_activations_list = []
 hipp_net_us_present_hidden_layer_activations_list = []
 hipp_net_us_absent_hidden_layer_activations_list = []
-
 for activ_list in cort_net_raw_hidden_list:
-    cort_net_us_present_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[cs_index[0]])))
+    cort_net_us_present_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[int(cs_index[0])])))
     try:
-        cort_net_us_absent_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[cs_index[0] + 1])))
+        cort_net_us_absent_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[int(cs_index[0]) + 1])))
     except IndexError:
-        cort_net_us_absent_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[cs_index[0] - 1])))
+        cort_net_us_absent_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[int(cs_index[0]) - 1])))
 for activ_list in hipp_net_raw_hidden_list:
-    hipp_net_us_present_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[cs_index[0]])))
+    hipp_net_us_present_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[int(cs_index[0])])))
     try:
-        hipp_net_us_absent_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[cs_index[0] + 1])))
+        hipp_net_us_absent_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[int(cs_index[0]) + 1])))
     except IndexError:
-        hipp_net_us_absent_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[cs_index[0] - 1])))
+        hipp_net_us_absent_hidden_layer_activations_list.append(list(map(lambda x: abs(x), activ_list[int(cs_index[0]) - 1])))
 # build out c_dist
 c_dist_list = []
 h_dist_list = []
@@ -205,6 +210,10 @@ for i in range(len(hipp_net_us_present_hidden_layer_activations_list)):
 # ############################### final data #################################
 # ############################################################################
 
+print(len(cort_net_us_absent_output_list))
+print(len(cort_net_us_present_output_list))
+print(len(c_dist_list))
+print(len(h_dist_list))
 final_data = {'X':cort_net_us_absent_output_list,
               'XA':cort_net_us_present_output_list,
               'C-Dist':c_dist_list,
