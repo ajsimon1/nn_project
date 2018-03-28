@@ -210,10 +210,6 @@ for i in range(len(hipp_net_us_present_hidden_layer_activations_list)):
 # ############################### final data #################################
 # ############################################################################
 
-print(len(cort_net_us_absent_output_list))
-print(len(cort_net_us_present_output_list))
-print(len(c_dist_list))
-print(len(h_dist_list))
 final_data = {'X':cort_net_us_absent_output_list,
               'XA':cort_net_us_present_output_list,
               'C-Dist':c_dist_list,
@@ -239,9 +235,12 @@ for scolp / phys
     for phys --> increased to  1.0 on us present and 0.1 on us absent
 
 '''
-
+print(np.array(cort_net_sims_hidden_list).shape)
+print(np.array(cort_net_sims_output_list).shape)
+print(np.array(hipp_net_sims_hidden_list).shape)
+print(np.array(hipp_net_sims_output_list).shape)
 # print('Criterion reached at block: {}'.format(find_criterion(network_output_df, 'XA', .91)))
-print(network_output_df)
+# print(network_output_df)
 # pp.pprint(hipp_net_raw_output_list)
 # pp.pprint(cort_net_raw_output_list)
 # print(data)
