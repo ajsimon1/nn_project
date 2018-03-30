@@ -7,7 +7,7 @@ import pandas as pd
 import theano.tensor as T
 
 from lasagne.layers import DenseLayer, InputLayer
-from lasagne.objectives import binary_crossentropy, aggregate
+from lasagne.objectives import binary_crossentropy, squared_error
 
 # ######################## Define Constants #################################
 N_CS = 5
@@ -47,7 +47,7 @@ def build_targets(input_var):
 
 # ################## Build Cortical Network #################################
 def build_cort_net(input_var=None):
-    l_input = lasagne.layers.InputLayer(shape=(input_var.shape),
+    l_input = lasagne.layers.InputLayer(shape=(None, 15),
                                         input_var=input_var)
     l_hidden = lasagne.layers.DenseLayer(
                 l_input,
@@ -61,7 +61,7 @@ def build_cort_net(input_var=None):
 
 # #################### Build Hippocampal Network ############################
 def build_hipp_net(input_var=None):
-    l_input = lasagne.layers.InputLayer(shape=(input_var.shape),
+    l_input = lasagne.layers.InputLayer(shape=(None, 15),
                                         input_var=input_var)
     l_hidden = lasagne.layers.DenseLayer(
             l_input,
@@ -76,25 +76,45 @@ def build_hipp_net(input_var=None):
 def run_nets(model='i', **kwargs):
     # define theano shared variables for both networks
     X_data_cort = T.matrix('X_data_cort')
+    y_cort = T.vector('y_cort')
     X_data_hipp = T.matrix('X_data_hipp')
-  
+    y_hipp = T.vector('y_hipp')
     # create nn models
-    print('Building Cortical & Hippocampal networks...')
-    cort_hidden_formula, cort_out_formula = build_cort_net(X_data_cort)
-    hipp_hidden_formula, hipp_out_formula = build_hipp_net(X_data_hipp)
+    print('Building networks based on {} model type...'.format(model))
+    cort_hid_layer, cort_out_layer = build_cort_net(input_var=X_data_cort)
+    hipp_hid_layer, hipp_out_layer = build_hipp_net(input_var=X_data_hipp)
+    cort_hid_formula, cort_out_formula = lasagne.layers.get_output([cort_hid_layer, cort_out_layer])
+    hipp_hid_formula, hipp_out_formula = lasagne.layers.get_output([hipp_hid_layer, hipp_out_layer])
+    cort_loss = lasagne.objectives.binary_crossentropy(cort_out_formula, kwargs['targets']).mean()
+    hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
+    # branching point for different models based on model type
+    if model == 'i':
+        cort_params = lasagne.layers.get_all_params([cort_out_layer], trainable=True)
+        cort_updates = lasagne.updates.adam(cort_loss, cort_params, learning_rate=0.1)
+        hipp_params = lasagne.layers.get_all_params([hipp_out_layer], trainable=True)
+        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.05, momentum=0.9)
+        feed_forward_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], allow_input_downcast=True)
+        back_update_cort = theano.function([X_data_cort], cort_loss, updates=cort_updates)
+        feed_dorward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
+        back_update_hipp = theano.function([X_data_hipp], hipp_loss, updates=hipp_updates)
+
 
 if __name__ == '__main__':
-    
+    model_dict = {
+        'i': 'intact',
+        'l': 'lesion',
+        's': 'scopolamine',
+        'p': 'physostigmine',
+        }
+    user_response = input('Select model type: intact(i), lesion(l), phystogimine(p), scopolomine(s): ')
     print('Building datasets...')
     input_var = build_dataset()
-    print('Dataset built )s :')
+    print('Dataset built as :')
     print(input_var)
     print('Building targets based on dataset...')
     targets, cs_index = build_targets(input_var)
     print('Targets built as: ')
     print(targets)
     print('The CS has built into the input vector at {} element'.format(cs_index + 1))
-    print('Cortical net hidden layer formula is {}'.format(cort_hidden_formula))
-    print('Cortical net output layer formula is {}'.format(cort_out_formula))
-    print('Hippocampal net hidden layer formula is {}'.format(hipp_hidden_formula))
-    print('Hippocampal net hidden layer formula is {}'.format(hipp_out_formula))
+    print('Building nets based on {} model type'.format(model_dict[str(user_response)]))
+    print(run_nets(model=user_response, targets=targets, input_var=input_var))
