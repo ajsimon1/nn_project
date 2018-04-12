@@ -73,6 +73,17 @@ def build_hipp_net(input_var=None):
             nonlinearity=lasagne.nonlinearities.sigmoid)
     return l_hidden, l_output            
 
+def iter_net(num_batches, forward_func, update_func, data):
+    # instatiate empty lists that are needed
+    raw_output_list = []
+    raw_hidden_list = []
+    for batch in range(num_batches):
+        forward_func(data)
+        raw_hid_value, raw_out_value = update_func(np.asarray(data))
+        raw_hidden_list.append(raw_hid_value)
+        raw_output_list.append(raw_out_value)
+    return raw_hidden_list, raw_output_list
+
 def run_nets(model='i', **kwargs):
     # define theano shared variables for both networks
     X_data_cort = T.matrix('X_data_cort')
@@ -94,11 +105,12 @@ def run_nets(model='i', **kwargs):
         hipp_params = lasagne.layers.get_all_params([hipp_out_layer], trainable=True)
         hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.05, momentum=0.9)
         feed_forward_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], allow_input_downcast=True)
-        back_update_cort = theano.function([X_data_cort], cort_loss, updates=cort_updates)
-        feed_dorward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
-        back_update_hipp = theano.function([X_data_hipp], hipp_loss, updates=hipp_updates)
-
-
+        back_update_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], updates=cort_updates, allow_input_downcast=True)
+        feed_forward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
+        back_update_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], updates=hipp_updates, allow_input_downcast=True)
+        cort_hidd_list, cort_out_list = iter_net(N_SAMPLES, feed_forward_cort, back_update_cort, kwargs['input_var'])
+        hipp_hidd_list, hipp_out_list = iter_net(N_SAMPLES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
+    return hipp_hidd_list, hipp_out_list, cort_hidd_list, cort_out_list
 if __name__ == '__main__':
     model_dict = {
         'i': 'intact',
