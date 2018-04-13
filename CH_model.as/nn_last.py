@@ -12,7 +12,7 @@ from lasagne.objectives import binary_crossentropy, squared_error
 # ######################## Define Constants #################################
 N_CS = 5
 N_CONTEXT = 10
-N_SAMPLES = 25
+N_SAMPLES = 250
 
 # ######################### Create Datasets #################################
 # create dataset with a conditioned stimulus (CS) and context.  the CS has
@@ -83,6 +83,56 @@ def iter_net(num_batches, forward_func, update_func, data):
         raw_hidden_list.append(raw_hid_value)
         raw_output_list.append(raw_out_value)
     return raw_hidden_list, raw_output_list
+def find_us_absent_present(index, out_list):
+    us_present_list = []
+    us_absent_list = []
+    for item in out_list:
+        us_present_list.append(float(item[index]))
+        try:
+            us_absent_list.append(float(item[index] + 1))
+        except IndexError:
+            us_absent_list.append(float(item[index] - 1))
+    return us_present_list, us_absent_list
+
+def get_hid_abs_value(index, cort_list, hipp_list):
+    cort_us_absent_list = []
+    cort_us_present_list = []
+    hipp_us_present_list = []
+    hipp_us_absent_list = []
+    for item in cort_list:
+        cort_us_present_list.append(list(map(lambda x: abs(x), item[index])))
+        try:
+            cort_us_absent_list.append(list(map(lambda x: abs(x), item[index + 1])))
+        except IndexError:
+            cort_us_absent_list.append(list(map(lambda x: abs(x), item[index - 1])))
+    for item in hipp_list:
+        hipp_us_present_list.append(list(map(lambda x: abs(x), item[index])))
+        try:
+            hipp_us_absent_list.append(list(map(lambda x: abs(x), item[index + 1])))
+        except IndexError:
+            hipp_us_absent_list.append(list(map(lambda x: abs(x), item[index - 1])))
+    return cort_us_present_list, cort_us_absent_list, hipp_us_present_list, hipp_us_absent_list
+
+def get_hamm_dist(cort_abs_list, cort_pres_list, hipp_abs_list, hipp_pres_list):
+    c_dist_list = []
+    h_dist_list = []
+    for item in range(len(cort_pres_list)):
+        c_dist = np.subtract(np.asarray(cort_abs_list), np.asarray(cort_pres_list))
+        c_dist_list.append(np.sum(c_dist))
+    for item in range(len(hipp_pres_list)):
+        h_dist = np.subtract(np.asarray(hipp_abs_list), np.asarray(hipp_pres_list))
+        h_dist_list.append(np.sum(h_dist))
+    return c_dist_list, h_dist_list
+
+def create_output(cort_us_abs, cort_us_pres, c_dist, h_dist):
+    final_data = {
+        'X': cort_us_abs,
+        'XA': cort_us_pres,
+        'C-Dist': c_dist,
+        'H-Dist': h_dist,
+        }
+    net_output = pd.DataFrame(final_data, columns=final_data.keys())
+    return net_output    
 
 def run_nets(model='i', **kwargs):
     # define theano shared variables for both networks
@@ -110,7 +160,12 @@ def run_nets(model='i', **kwargs):
         back_update_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], updates=hipp_updates, allow_input_downcast=True)
         cort_hidd_list, cort_out_list = iter_net(N_SAMPLES, feed_forward_cort, back_update_cort, kwargs['input_var'])
         hipp_hidd_list, hipp_out_list = iter_net(N_SAMPLES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
-    return hipp_hidd_list, hipp_out_list, cort_hidd_list, cort_out_list
+        cort_us_present_out_list, cort_us_absent_out_list = find_us_absent_present(kwargs['index'], cort_out_list)
+        cort_us_present_hid_list, cort_us_absent_hid_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_hidd_list, hipp_hidd_list)
+        c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
+        i_net_output = create_output(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
+    return i_net_output
+    
 if __name__ == '__main__':
     model_dict = {
         'i': 'intact',
@@ -129,4 +184,7 @@ if __name__ == '__main__':
     print(targets)
     print('The CS has built into the input vector at {} element'.format(cs_index + 1))
     print('Building nets based on {} model type'.format(model_dict[str(user_response)]))
-    print(run_nets(model=user_response, targets=targets, input_var=input_var))
+    df  = run_nets(model=user_response, targets=targets, input_var=input_var, index=cs_index)
+    print(df.round(3))
+    # TODO hey, get the batch sorted, you have 250 and thats not right, check the results
+    # also, 'X' looks off check that, maybe run a grpah
