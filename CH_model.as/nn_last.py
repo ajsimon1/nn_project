@@ -14,6 +14,7 @@ N_CS = 5
 N_CONTEXT = 10
 N_SAMPLES = 25
 N_BATCHES = 250
+N_SIMS = 5
 
 # ######################### Create Datasets #################################
 # create dataset with a conditioned stimulus (CS) and context.  the CS has
@@ -169,7 +170,14 @@ def run_nets(model='i', **kwargs):
         c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
         i_net_output = create_output(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
     return i_net_output
-    
+
+def find_criterion(df, column, threshold):
+    try:
+        crit = df.loc[df[str(column)] >= threshold].index.values[0]
+    except IndexError:
+        return 'Criterion not reached'
+    return crit
+
 if __name__ == '__main__':
     model_dict = {
         'i': 'intact',
@@ -188,7 +196,11 @@ if __name__ == '__main__':
     print(targets)
     print('The CS has built into the input vector at {} element'.format(cs_index + 1))
     print('Building nets based on {} model type'.format(model_dict[str(user_response)]))
-    df  = run_nets(model=user_response, targets=targets, input_var=input_var, index=cs_index)
-    print(df.round(3))
-    # TODO hey, get the batch sorted, you have 250 and thats not right, check the results
-    # also, 'X' looks off check that, maybe run a grpah
+    df_list = []
+    for sim in range(N_SIMS):
+        df  = run_nets(model=user_response, targets=targets, input_var=input_var, index=cs_index)
+        df_list.append(df) 
+    df_concat = pd.concat(df_list)
+    df_concat_by_index = df_concat.groupby(df_concat.index)
+    df_concat_by_index.round(2)
+    print(df_concat_by_index.mean())
