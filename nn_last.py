@@ -15,12 +15,6 @@ N_SAMPLES = 25
 N_BATCHES = 250
 N_SIMS = 20
 
-model_dict = {
-    'i': 'intact',
-    'l': 'lesion',
-    's': 'scopolamine',
-    'p': 'physostigmine',
-    }
 # ######################### Create Datasets #################################
 # create dataset with a conditioned stimulus (CS) and context.  the CS has
 # 5 elements and the context has 10 creating an input vector of 15 total
@@ -59,6 +53,7 @@ def build_cort_net(input_var=None):
     l_hidden = lasagne.layers.DenseLayer(
                 l_input,
                 num_units=40,
+                W=lasagne.init.Uniform(range=3.0),
                 nonlinearity=lasagne.nonlinearities.rectify)
     l_output = lasagne.layers.DenseLayer(
                 l_hidden,
@@ -73,6 +68,7 @@ def build_hipp_net(input_var=None):
     l_hidden = lasagne.layers.DenseLayer(
             l_input,
             num_units=8,
+            W=lasagne.init.Uniform(range=3.0),
             nonlinearity=lasagne.nonlinearities.rectify)
     l_output = lasagne.layers.DenseLayer(
             l_hidden,
@@ -125,10 +121,10 @@ def get_hamm_dist(cort_abs_list, cort_pres_list, hipp_abs_list, hipp_pres_list):
     c_dist_list = []
     h_dist_list = []
     for item in range(len(cort_pres_list)):
-        c_dist = np.subtract(np.asarray(cort_abs_list), np.asarray(cort_pres_list[item]))
+        c_dist = np.absolute(np.subtract(np.asarray(cort_abs_list[item]), np.asarray(cort_pres_list[item])))
         c_dist_list.append(np.sum(c_dist))
     for item in range(len(hipp_pres_list)):
-        h_dist = np.subtract(np.asarray(hipp_abs_list), np.asarray(hipp_pres_list[item]))
+        h_dist = np.absolute(np.subtract(np.asarray(hipp_abs_list[item]), np.asarray(hipp_pres_list[item])))
         h_dist_list.append(np.sum(h_dist))
     return c_dist_list, h_dist_list
 
@@ -143,6 +139,12 @@ def create_output(cort_us_abs, cort_us_pres, c_dist, h_dist):
     return net_output
 
 def run_nets(model='i', **kwargs):
+    model_dict = {
+        'i': 'intact',
+        'l': 'lesion',
+        's': 'scopolamine',
+        'p': 'physostigmine',
+        }
     # define theano shared variables for both networks
     X_data_cort = T.matrix('X_data_cort')
     y_cort = T.vector('y_cort')
@@ -213,7 +215,7 @@ def run_nets(model='i', **kwargs):
         cort_grads = theano.grad(cort_loss, wrt=cort_params)
         cort_updates = lasagne.updates.adam(cort_grads, cort_params, learning_rate=0.1)
         hipp_params = lasagne.layers.get_all_params(hipp_out_layer, trainable=True)
-        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=.05, momentum=0.9)
+        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=.005, momentum=0.9)
         feed_forward_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], allow_input_downcast=True)
         back_update_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], updates=cort_updates, allow_input_downcast=True)
         feed_forward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
@@ -251,7 +253,5 @@ if __name__ == '__main__':
         df_list.append(df)
     df_concat = pd.concat(df_list)
     df_concat_by_index = df_concat.groupby(df_concat.index)
-    final_df = df_concat_by_index.mean().round(decimals=2)
-    final_df.to_excel('C:\\Users\\Adam\\Documents\\Python Scripts\\Projects\\nn_project\\CH_model.as\\output.xlsx',sheet_name=model_dict[user_response])
-    df_concat_by_index.mean().plot(y=['X', 'XA'])
-    plt.show()
+    print(df_concat_by_index.mean().round(decimals=2))
+    df_concat_by_index.mean().plot()
