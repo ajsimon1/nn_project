@@ -53,6 +53,7 @@ def build_cort_net(input_var=None):
     l_hidden = lasagne.layers.DenseLayer(
                 l_input,
                 num_units=40,
+                W=lasagne.init.Uniform(range=3.0),
                 nonlinearity=lasagne.nonlinearities.rectify)
     l_output = lasagne.layers.DenseLayer(
                 l_hidden,
@@ -67,6 +68,7 @@ def build_hipp_net(input_var=None):
     l_hidden = lasagne.layers.DenseLayer(
             l_input,
             num_units=8,
+            W=lasagne.init.Uniform(range=3.0),
             nonlinearity=lasagne.nonlinearities.rectify)                                        
     l_output = lasagne.layers.DenseLayer(
             l_hidden,
@@ -119,10 +121,10 @@ def get_hamm_dist(cort_abs_list, cort_pres_list, hipp_abs_list, hipp_pres_list):
     c_dist_list = []
     h_dist_list = []
     for item in range(len(cort_pres_list)):
-        c_dist = np.subtract(np.asarray(cort_abs_list), np.asarray(cort_pres_list[item]))
+        c_dist = np.absolute(np.subtract(np.asarray(cort_abs_list[item]), np.asarray(cort_pres_list[item])))
         c_dist_list.append(np.sum(c_dist))
     for item in range(len(hipp_pres_list)):
-        h_dist = np.subtract(np.asarray(hipp_abs_list), np.asarray(hipp_pres_list[item]))
+        h_dist = np.absolute(np.subtract(np.asarray(hipp_abs_list[item]), np.asarray(hipp_pres_list[item])))
         h_dist_list.append(np.sum(h_dist))
     return c_dist_list, h_dist_list
 
