@@ -14,7 +14,7 @@ N_CONTEXT = 10
 N_SAMPLES = 25
 N_BATCHES = 250
 N_SIMS = 20
-
+output_file = 'output.xlsx'
 # ######################### Create Datasets #################################
 # create dataset with a conditioned stimulus (CS) and context.  the CS has
 # 5 elements and the context has 10 creating an input vector of 15 total
@@ -128,7 +128,7 @@ def get_hamm_dist(cort_abs_list, cort_pres_list, hipp_abs_list, hipp_pres_list):
         h_dist_list.append(np.sum(h_dist))
     return c_dist_list, h_dist_list
 
-def create_output(cort_us_abs, cort_us_pres, c_dist, h_dist):
+def create_dataframe(cort_us_abs, cort_us_pres, c_dist, h_dist):
     final_data = {
         'X': cort_us_abs,
         'XA': cort_us_pres,
@@ -175,7 +175,7 @@ def run_nets(model='i', **kwargs):
         cort_us_present_out_list, cort_us_absent_out_list = find_us_absent_present(kwargs['index'], cort_out_list)
         cort_us_present_hid_list, cort_us_absent_hid_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_hidd_list, hipp_hidd_list)
         c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
-        net_output = create_output(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
+        net_output = create_dataframe(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
     elif model == 'p':
         cort_params = lasagne.layers.get_all_params(cort_out_layer, trainable=True)
         cort_grads = theano.grad(cort_loss, wrt=cort_params)
@@ -191,7 +191,7 @@ def run_nets(model='i', **kwargs):
         cort_us_present_out_list, cort_us_absent_out_list = find_us_absent_present(kwargs['index'], cort_out_list)
         cort_us_present_hid_list, cort_us_absent_hid_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_hidd_list, hipp_hidd_list)
         c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
-        net_output = create_output(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
+        net_output = create_dataframe(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
     elif model == 's':
         cort_params = lasagne.layers.get_all_params(cort_out_layer, trainable=True)
         cort_grads = theano.grad(cort_loss, wrt=cort_params)
@@ -207,7 +207,7 @@ def run_nets(model='i', **kwargs):
         cort_us_present_out_list, cort_us_absent_out_list = find_us_absent_present(kwargs['index'], cort_out_list)
         cort_us_present_hid_list, cort_us_absent_hid_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_hidd_list, hipp_hidd_list)
         c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
-        net_output = create_output(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
+        net_output = create_dataframe(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
     else:
         cort_hid_layer.params[cort_hid_layer.W].remove('trainable')
         cort_hid_layer.params[cort_hid_layer.b].remove('trainable')
@@ -225,7 +225,7 @@ def run_nets(model='i', **kwargs):
         cort_us_present_out_list, cort_us_absent_out_list = find_us_absent_present(kwargs['index'], cort_out_list)
         cort_us_present_hid_list, cort_us_absent_hid_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_hidd_list, hipp_hidd_list)
         c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
-        net_output = create_output(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
+        net_output = create_dataframe(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
 
     return net_output
 
@@ -235,6 +235,26 @@ def find_criterion(df, column, threshold):
     except IndexError:
         return 'Criterion not reached'
     return crit
+
+def run_sims(num_sims, **kwargs):
+    df_list = []
+    for sim in range(num_sims):
+        df = run_nets(model=kwargs['model'],
+                        targets=kwargs['targets'],
+                        input_var=kwargs['input_var'],
+                        index=kwargs['index'],
+                        count=int(sim))
+        df_list.append(df)
+    return df_list
+
+def create_output(df_list, filename):
+    df_concat = pd.concat(df_list)
+    df_concat_by_index = df_concat.groupby(df_concat.index)
+    df_final = df_concat_by_index.mean().round(decimals=2)
+    xl_writer = pd.ExcelWriter('output.xlsx')
+    df_final.to_excel(xl_writer, 'Sheet1')
+    xl_writer.save()
+    return df_final
 
 if __name__ == '__main__':
     user_response = input('Select model type: intact(i), lesion(l), phystogimine(p), scopolomine(s): ')
@@ -247,11 +267,12 @@ if __name__ == '__main__':
     print('Targets built as: ')
     print(targets)
     print('The CS has built into the input vector at {} element'.format(cs_index + 1))
-    df_list = []
-    for sim in range(N_SIMS):
-        df  = run_nets(model=user_response, targets=targets, input_var=input_var, index=cs_index, count=int(sim))
-        df_list.append(df)
-    df_concat = pd.concat(df_list)
-    df_concat_by_index = df_concat.groupby(df_concat.index)
-    print(df_concat_by_index.mean().round(decimals=2))
-    df_concat_by_index.mean().plot()
+    df_list = run_sims(N_SIMS,
+                        model=user_response,
+                        targets=targets,
+                        input_var=input_var,
+                        index=cs_index)
+    df_final = create_output(df_list, output_file)
+    print(df_final)
+    df_final.plot()
+    plt.show()
