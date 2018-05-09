@@ -13,7 +13,7 @@ N_CS = 5
 N_CONTEXT = 10
 N_SAMPLES = 25
 N_BATCHES = 250
-N_SIMS = 20
+N_SIMS = 2
 output_file = 'output.xlsx'
 # ######################### Create Datasets #################################
 # create dataset with a conditioned stimulus (CS) and context.  the CS has
@@ -46,20 +46,27 @@ def build_targets(input_var):
     cs_index = targets.index( 1.)
     return np.asarray(targets), cs_index
 
-# ################## Build Cortical Network #################################
-def build_cort_net(input_var=None):
+# ################## Build Lower Cortical Network #############################
+def build_cort_low_net(input_var=None):
     l_input = lasagne.layers.InputLayer(shape=(None, 15),
                                         input_var=input_var)
-    l_hidden = lasagne.layers.DenseLayer(
+    l_output = lasagne.layers.DenseLayer(
                 l_input,
                 num_units=40,
                 W=lasagne.init.Uniform(range=3.0),
                 nonlinearity=lasagne.nonlinearities.rectify)
+    return l_output
+
+# ################## Build Upper Cortical Network #############################
+def build_cort_up_net(input_var=None):
+    l_input = lasagne.layers.InputLayer(shape=(None, 40),
+                                        input_var=input_var)
     l_output = lasagne.layers.DenseLayer(
-                l_hidden,
+                l_input,
                 num_units=1,
+                W=lasagne.init.Uniform(range=3.0),
                 nonlinearity=lasagne.nonlinearities.sigmoid)
-    return l_hidden, l_output
+    return l_output
 
 # #################### Build Hippocampal Network ############################
 def build_hipp_net(input_var=None):
@@ -146,15 +153,15 @@ def run_nets(model='i', **kwargs):
         'p': 'physostigmine',
         }
     # define theano shared variables for both networks
-    X_data_cort = T.matrix('X_data_cort')
-    y_cort = T.vector('y_cort')
+    X_data_cort_low = T.matrix('X_data_cort_low')
+    X_data_cort_up = T.matrix('X_data_cort_up')
     X_data_hipp = T.matrix('X_data_hipp')
-    y_hipp = T.vector('y_hipp')
     # create nn models
     print('Building networks based on {} model type, {} simulation...'.format(model_dict[str(model)], kwargs['count']))
-    cort_hid_layer, cort_out_layer = build_cort_net(input_var=X_data_cort)
+    cort_low_out_layer = build_cort_low_net(input_var=X_data_cort_low)
+    cort_up__out_layer = build_cort_up_net(input_var=X_data_cort_up)
     hipp_hid_layer, hipp_out_layer = build_hipp_net(input_var=X_data_hipp)
-    cort_hid_formula, cort_out_formula = lasagne.layers.get_output([cort_hid_layer, cort_out_layer])
+    cort_low_out_formula, cort_up_out_formula = lasagne.layers.get_output([cort_low_out_layer, cort_up_out_layer])
     hipp_hid_formula, hipp_out_formula = lasagne.layers.get_output([hipp_hid_layer, hipp_out_layer])
     cort_loss = lasagne.objectives.binary_crossentropy(cort_out_formula, kwargs['targets'])
     cort_loss = lasagne.objectives.aggregate(cort_loss, mode='mean')
@@ -272,7 +279,7 @@ if __name__ == '__main__':
                         targets=targets,
                         input_var=input_var,
                         index=cs_index)
-    df_final = create_output(df_list, output_file)
+    # df_final = create_output(df_list, output_file)
     print(df_final)
-    df_final.plot()
-    plt.show()
+    # df_final.plot()
+    # plt.show()
