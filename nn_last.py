@@ -5,15 +5,12 @@ import numpy as np
 import pandas as pd
 import theano.tensor as T
 
-from lasagne.layers import DenseLayer, InputLayer
-from lasagne.objectives import binary_crossentropy, squared_error
-
 # ######################## Define Constants #################################
 N_CS = 5
 N_CONTEXT = 10
 N_SAMPLES = 25
 N_BATCHES = 250
-N_SIMS = 2
+N_SIMS = 20
 output_file = 'output.xlsx'
 # ######################### Create Datasets #################################
 # create dataset with a conditioned stimulus (CS) and context.  the CS has
@@ -83,7 +80,7 @@ def build_hipp_net(input_var=None):
             nonlinearity=lasagne.nonlinearities.sigmoid)
     return l_hidden, l_output
 
-def iter_net(num_batches, forward_func, update_func, data):
+def iter_hipp_net(num_batches, forward_func, update_func, data):
     # instatiate empty lists that are needed
     raw_output_list = []
     raw_hidden_list = []
@@ -93,6 +90,15 @@ def iter_net(num_batches, forward_func, update_func, data):
         raw_hidden_list.append(raw_hid_value)
         raw_output_list.append(raw_out_value)
     return raw_hidden_list, raw_output_list
+
+def iter_cort_net(num_batches, forward_func, update_func, data):
+    # instatiate empty lists that are needed
+    raw_out_list = []
+    for batch in range(num_batches):
+        forward_func(data)
+        raw_out_value = update_func(data)
+        raw_out_list.append(raw_out_value)
+    return raw_out_list
 
 def find_us_absent_present(index, out_list):
     us_present_list = []
@@ -145,6 +151,11 @@ def create_dataframe(cort_us_abs, cort_us_pres, c_dist, h_dist):
     net_output = pd.DataFrame(final_data, columns=final_data.keys())
     return net_output
 
+def convert_hipp_hidd_layer(hipp_hidd_list):
+    return_list = [list(x) * 5 for x in hipp_hidd_list[len(hipp_hidd_list) - 1]]
+    # print(return_list)
+    return return_list
+
 def run_nets(model='i', **kwargs):
     model_dict = {
         'i': 'intact',
@@ -159,80 +170,122 @@ def run_nets(model='i', **kwargs):
     # create nn models
     print('Building networks based on {} model type, {} simulation...'.format(model_dict[str(model)], kwargs['count']))
     cort_low_out_layer = build_cort_low_net(input_var=X_data_cort_low)
-    cort_up__out_layer = build_cort_up_net(input_var=X_data_cort_up)
+    cort_low_out_formula = lasagne.layers.get_output(cort_low_out_layer)
+    cort_up_out_layer = build_cort_up_net(input_var=X_data_cort_up)
+    cort_up_out_formula = lasagne.layers.get_output(cort_up_out_layer)
     hipp_hid_layer, hipp_out_layer = build_hipp_net(input_var=X_data_hipp)
-    cort_low_out_formula, cort_up_out_formula = lasagne.layers.get_output([cort_low_out_layer, cort_up_out_layer])
     hipp_hid_formula, hipp_out_formula = lasagne.layers.get_output([hipp_hid_layer, hipp_out_layer])
-    cort_loss = lasagne.objectives.binary_crossentropy(cort_out_formula, kwargs['targets'])
-    cort_loss = lasagne.objectives.aggregate(cort_loss, mode='mean')
-    hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
     # branching point for different models based on model type
     if model == 'i':
-        cort_params = lasagne.layers.get_all_params(cort_out_layer, trainable=True)
-        cort_grads = theano.grad(cort_loss, wrt=cort_params)
-        cort_updates = lasagne.updates.adam(cort_grads, cort_params, learning_rate=0.1)
+        hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
         hipp_params = lasagne.layers.get_all_params(hipp_out_layer, trainable=True)
-        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.05, momentum=0.9)
-        feed_forward_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], allow_input_downcast=True)
-        back_update_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], updates=cort_updates, allow_input_downcast=True)
+        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.05, momentum=0.5)
         feed_forward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
         back_update_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], updates=hipp_updates, allow_input_downcast=True)
-        cort_hidd_list, cort_out_list = iter_net(N_BATCHES, feed_forward_cort, back_update_cort, kwargs['input_var'])
-        hipp_hidd_list, hipp_out_list = iter_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
-        cort_us_present_out_list, cort_us_absent_out_list = find_us_absent_present(kwargs['index'], cort_out_list)
-        cort_us_present_hid_list, cort_us_absent_hid_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_hidd_list, hipp_hidd_list)
-        c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
-        net_output = create_dataframe(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
+        hipp_hidd_list, hipp_out_list = iter_hipp_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
+        cort_low_targets = convert_hipp_hidd_layer(hipp_hidd_list)
+        cort_up_loss = lasagne.objectives.binary_crossentropy(cort_up_out_formula, kwargs['targets'])
+        cort_up_loss = lasagne.objectives.aggregate(cort_up_loss, mode='mean')
+        cort_low_loss = lasagne.objectives.squared_error(cort_low_out_formula, cort_low_targets).mean()
+        cort_up_params = lasagne.layers.get_all_params(cort_up_out_layer, trainable=True)
+        cort_up_grads = theano.grad(cort_up_loss, wrt=cort_up_params)
+        cort_up_updates = lasagne.updates.sgd(cort_up_loss, cort_up_params, learning_rate=0.5)
+        cort_low_params = lasagne.layers.get_all_params(cort_low_out_layer, trainable=True)
+        cort_low_grads = theano.grad(cort_low_loss, wrt=cort_low_params)
+        cort_low_updates = lasagne.updates.sgd(cort_low_loss, cort_low_params, learning_rate=0.1)
+        feed_forward_cort_low = theano.function([X_data_cort_low], cort_low_out_formula, allow_input_downcast=True)
+        feed_forward_cort_up = theano.function([X_data_cort_up], cort_up_out_formula, allow_input_downcast=True)
+        back_update_cort_low = theano.function([X_data_cort_low], cort_low_out_formula, updates=cort_low_updates, allow_input_downcast=True)
+        back_update_cort_up = theano.function([X_data_cort_up], cort_up_out_formula, updates=cort_up_updates, allow_input_downcast=True)
+        cort_low_out_list = iter_cort_net(N_BATCHES, feed_forward_cort_low, back_update_cort_low, kwargs['input_var'])
+        cort_up_out_list = iter_cort_net(N_BATCHES, feed_forward_cort_up, back_update_cort_up, cort_low_out_list[len(cort_low_out_list)-1])
+        cort_us_present_up_out_list, cort_us_absent_up_out_list = find_us_absent_present(kwargs['index'], cort_up_out_list)
+        cort_us_present_low_out_list, cort_us_absent_low_out_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_low_out_list, hipp_hidd_list)
+        c_dist, h_dist = get_hamm_dist(cort_us_absent_low_out_list, cort_us_present_low_out_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
+        net_output = create_dataframe(cort_us_absent_up_out_list, cort_us_present_up_out_list, c_dist, h_dist)
     elif model == 'p':
-        cort_params = lasagne.layers.get_all_params(cort_out_layer, trainable=True)
-        cort_grads = theano.grad(cort_loss, wrt=cort_params)
-        cort_updates = lasagne.updates.adam(cort_grads, cort_params, learning_rate=0.1)
+        hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
         hipp_params = lasagne.layers.get_all_params(hipp_out_layer, trainable=True)
-        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=1.0, momentum=0.9)
-        feed_forward_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], allow_input_downcast=True)
-        back_update_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], updates=cort_updates, allow_input_downcast=True)
+        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=1.0, momentum=0.5)
         feed_forward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
         back_update_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], updates=hipp_updates, allow_input_downcast=True)
-        cort_hidd_list, cort_out_list = iter_net(N_BATCHES, feed_forward_cort, back_update_cort, kwargs['input_var'])
-        hipp_hidd_list, hipp_out_list = iter_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
-        cort_us_present_out_list, cort_us_absent_out_list = find_us_absent_present(kwargs['index'], cort_out_list)
-        cort_us_present_hid_list, cort_us_absent_hid_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_hidd_list, hipp_hidd_list)
-        c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
-        net_output = create_dataframe(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
+        hipp_hidd_list, hipp_out_list = iter_hipp_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
+        cort_low_targets = convert_hipp_hidd_layer(hipp_hidd_list)
+        cort_up_loss = lasagne.objectives.binary_crossentropy(cort_up_out_formula, kwargs['targets'])
+        cort_up_loss = lasagne.objectives.aggregate(cort_up_loss, mode='mean')
+        cort_low_loss = lasagne.objectives.squared_error(cort_low_out_formula, cort_low_targets).mean()
+        cort_up_params = lasagne.layers.get_all_params(cort_up_out_layer, trainable=True)
+        cort_up_grads = theano.grad(cort_up_loss, wrt=cort_up_params)
+        cort_up_updates = lasagne.updates.sgd(cort_up_loss, cort_up_params, learning_rate=0.5)
+        cort_low_params = lasagne.layers.get_all_params(cort_low_out_layer, trainable=True)
+        cort_low_grads = theano.grad(cort_low_loss, wrt=cort_low_params)
+        cort_low_updates = lasagne.updates.sgd(cort_low_loss, cort_low_params, learning_rate=0.1)
+        feed_forward_cort_low = theano.function([X_data_cort_low], cort_low_out_formula, allow_input_downcast=True)
+        feed_forward_cort_up = theano.function([X_data_cort_up], cort_up_out_formula, allow_input_downcast=True)
+        back_update_cort_low = theano.function([X_data_cort_low], cort_low_out_formula, updates=cort_low_updates, allow_input_downcast=True)
+        back_update_cort_up = theano.function([X_data_cort_up], cort_up_out_formula, updates=cort_up_updates, allow_input_downcast=True)
+        cort_low_out_list = iter_cort_net(N_BATCHES, feed_forward_cort_low, back_update_cort_low, kwargs['input_var'])
+        cort_up_out_list = iter_cort_net(N_BATCHES, feed_forward_cort_up, back_update_cort_up, cort_low_out_list[len(cort_low_out_list)-1])
+        cort_us_present_up_out_list, cort_us_absent_up_out_list = find_us_absent_present(kwargs['index'], cort_up_out_list)
+        cort_us_present_low_out_list, cort_us_absent_low_out_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_low_out_list, hipp_hidd_list)
+        c_dist, h_dist = get_hamm_dist(cort_us_absent_low_out_list, cort_us_present_low_out_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
+        net_output = create_dataframe(cort_us_absent_up_out_list, cort_us_present_up_out_list, c_dist, h_dist)
     elif model == 's':
-        cort_params = lasagne.layers.get_all_params(cort_out_layer, trainable=True)
-        cort_grads = theano.grad(cort_loss, wrt=cort_params)
-        cort_updates = lasagne.updates.adam(cort_grads, cort_params, learning_rate=0.1)
+        hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
         hipp_params = lasagne.layers.get_all_params(hipp_out_layer, trainable=True)
-        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=.005, momentum=0.9)
-        feed_forward_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], allow_input_downcast=True)
-        back_update_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], updates=cort_updates, allow_input_downcast=True)
+        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.001, momentum=0.5)
         feed_forward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
         back_update_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], updates=hipp_updates, allow_input_downcast=True)
-        cort_hidd_list, cort_out_list = iter_net(N_BATCHES, feed_forward_cort, back_update_cort, kwargs['input_var'])
-        hipp_hidd_list, hipp_out_list = iter_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
-        cort_us_present_out_list, cort_us_absent_out_list = find_us_absent_present(kwargs['index'], cort_out_list)
-        cort_us_present_hid_list, cort_us_absent_hid_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_hidd_list, hipp_hidd_list)
-        c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
-        net_output = create_dataframe(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
+        hipp_hidd_list, hipp_out_list = iter_hipp_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
+        cort_low_targets = convert_hipp_hidd_layer(hipp_hidd_list)
+        cort_up_loss = lasagne.objectives.binary_crossentropy(cort_up_out_formula, kwargs['targets'])
+        cort_up_loss = lasagne.objectives.aggregate(cort_up_loss, mode='mean')
+        cort_low_loss = lasagne.objectives.squared_error(cort_low_out_formula, cort_low_targets).mean()
+        cort_up_params = lasagne.layers.get_all_params(cort_up_out_layer, trainable=True)
+        cort_up_grads = theano.grad(cort_up_loss, wrt=cort_up_params)
+        cort_up_updates = lasagne.updates.sgd(cort_up_loss, cort_up_params, learning_rate=0.5)
+        cort_low_params = lasagne.layers.get_all_params(cort_low_out_layer, trainable=True)
+        cort_low_grads = theano.grad(cort_low_loss, wrt=cort_low_params)
+        cort_low_updates = lasagne.updates.sgd(cort_low_loss, cort_low_params, learning_rate=0.1)
+        feed_forward_cort_low = theano.function([X_data_cort_low], cort_low_out_formula, allow_input_downcast=True)
+        feed_forward_cort_up = theano.function([X_data_cort_up], cort_up_out_formula, allow_input_downcast=True)
+        back_update_cort_low = theano.function([X_data_cort_low], cort_low_out_formula, updates=cort_low_updates, allow_input_downcast=True)
+        back_update_cort_up = theano.function([X_data_cort_up], cort_up_out_formula, updates=cort_up_updates, allow_input_downcast=True)
+        cort_low_out_list = iter_cort_net(N_BATCHES, feed_forward_cort_low, back_update_cort_low, kwargs['input_var'])
+        cort_up_out_list = iter_cort_net(N_BATCHES, feed_forward_cort_up, back_update_cort_up, cort_low_out_list[len(cort_low_out_list)-1])
+        cort_us_present_up_out_list, cort_us_absent_up_out_list = find_us_absent_present(kwargs['index'], cort_up_out_list)
+        cort_us_present_low_out_list, cort_us_absent_low_out_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_low_out_list, hipp_hidd_list)
+        c_dist, h_dist = get_hamm_dist(cort_us_absent_low_out_list, cort_us_present_low_out_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
+        net_output = create_dataframe(cort_us_absent_up_out_list, cort_us_present_up_out_list, c_dist, h_dist)
     else:
-        cort_hid_layer.params[cort_hid_layer.W].remove('trainable')
-        cort_hid_layer.params[cort_hid_layer.b].remove('trainable')
-        cort_params = lasagne.layers.get_all_params(cort_out_layer, trainable=True)
-        cort_grads = theano.grad(cort_loss, wrt=cort_params)
-        cort_updates = lasagne.updates.adam(cort_grads, cort_params, learning_rate=0.1)
+        cort_low_out_layer.params[cort_low_out_layer.W].remove('trainable')
+        cort_low_out_layer.params[cort_low_out_layer.b].remove('trainable')
+        hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
         hipp_params = lasagne.layers.get_all_params(hipp_out_layer, trainable=True)
-        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=.005, momentum=0.9)
-        feed_forward_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], allow_input_downcast=True)
-        back_update_cort = theano.function([X_data_cort], [cort_hid_formula, cort_out_formula], updates=cort_updates, allow_input_downcast=True)
+        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.05, momentum=0.5)
         feed_forward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
         back_update_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], updates=hipp_updates, allow_input_downcast=True)
-        cort_hidd_list, cort_out_list = iter_net(N_BATCHES, feed_forward_cort, back_update_cort, kwargs['input_var'])
-        hipp_hidd_list, hipp_out_list = iter_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
-        cort_us_present_out_list, cort_us_absent_out_list = find_us_absent_present(kwargs['index'], cort_out_list)
-        cort_us_present_hid_list, cort_us_absent_hid_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_hidd_list, hipp_hidd_list)
-        c_dist, h_dist = get_hamm_dist(cort_us_absent_hid_list, cort_us_present_hid_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
-        net_output = create_dataframe(cort_us_absent_out_list, cort_us_present_out_list, c_dist, h_dist)
+        hipp_hidd_list, hipp_out_list = iter_hipp_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
+        cort_low_targets = convert_hipp_hidd_layer(hipp_hidd_list)
+        cort_up_loss = lasagne.objectives.binary_crossentropy(cort_up_out_formula, kwargs['targets'])
+        cort_up_loss = lasagne.objectives.aggregate(cort_up_loss, mode='mean')
+        cort_low_loss = lasagne.objectives.squared_error(cort_low_out_formula, cort_low_targets).mean()
+        cort_up_params = lasagne.layers.get_all_params(cort_up_out_layer, trainable=True)
+        cort_up_grads = theano.grad(cort_up_loss, wrt=cort_up_params)
+        cort_up_updates = lasagne.updates.sgd(cort_up_loss, cort_up_params, learning_rate=0.5)
+        cort_low_params = lasagne.layers.get_all_params(cort_low_out_layer, trainable=True)
+        cort_low_grads = theano.grad(cort_low_loss, wrt=cort_low_params)
+        cort_low_updates = lasagne.updates.sgd(cort_low_loss, cort_low_params, learning_rate=0.1)
+        feed_forward_cort_low = theano.function([X_data_cort_low], cort_low_out_formula, allow_input_downcast=True)
+        feed_forward_cort_up = theano.function([X_data_cort_up], cort_up_out_formula, allow_input_downcast=True)
+        back_update_cort_low = theano.function([X_data_cort_low], cort_low_out_formula, updates=cort_low_updates, allow_input_downcast=True)
+        back_update_cort_up = theano.function([X_data_cort_up], cort_up_out_formula, updates=cort_up_updates, allow_input_downcast=True)
+        cort_low_out_list = iter_cort_net(N_BATCHES, feed_forward_cort_low, back_update_cort_low, kwargs['input_var'])
+        cort_up_out_list = iter_cort_net(N_BATCHES, feed_forward_cort_up, back_update_cort_up, cort_low_out_list[len(cort_low_out_list)-1])
+        cort_us_present_up_out_list, cort_us_absent_up_out_list = find_us_absent_present(kwargs['index'], cort_up_out_list)
+        cort_us_present_low_out_list, cort_us_absent_low_out_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_low_out_list, hipp_hidd_list)
+        c_dist, h_dist = get_hamm_dist(cort_us_absent_low_out_list, cort_us_present_low_out_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
+        net_output = create_dataframe(cort_us_absent_up_out_list, cort_us_present_up_out_list, c_dist, h_dist)
 
     return net_output
 
@@ -259,8 +312,9 @@ def create_output(df_list, filename):
     df_concat_by_index = df_concat.groupby(df_concat.index)
     df_final = df_concat_by_index.mean().round(decimals=2)
     xl_writer = pd.ExcelWriter('output.xlsx')
-    df_final.to_excel(xl_writer, 'Sheet1')
+    df_final.to_excel(xl_writer, 'Sheet2')
     xl_writer.save()
+    df_final[['X', 'XA']].plot()
     return df_final
 
 if __name__ == '__main__':
@@ -279,7 +333,5 @@ if __name__ == '__main__':
                         targets=targets,
                         input_var=input_var,
                         index=cs_index)
-    # df_final = create_output(df_list, output_file)
-    print(df_final)
-    # df_final.plot()
-    # plt.show()
+    df_final = create_output(df_list, output_file)
+    plt.show()
