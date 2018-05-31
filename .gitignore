@@ -3,3 +3,6 @@
 *.jpg
 *.xlsx
 *.xls
+*.doc
+*.docx
+*checkpoint.ipynb
