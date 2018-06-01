@@ -286,7 +286,6 @@ def run_nets(model='i', **kwargs):
         cort_us_present_low_out_list, cort_us_absent_low_out_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_low_out_list, hipp_hidd_list)
         c_dist, h_dist = get_hamm_dist(cort_us_absent_low_out_list, cort_us_present_low_out_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
         net_output = create_dataframe(cort_us_absent_up_out_list, cort_us_present_up_out_list, c_dist, h_dist)
-
     return net_output
 
 def find_criterion(df, column, threshold):
