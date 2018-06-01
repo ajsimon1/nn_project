@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import theano.tensor as T
+import datetime
 
 # ######################## Define Constants #################################
 N_CS = 5
@@ -11,7 +12,7 @@ N_CONTEXT = 10
 N_SAMPLES = 25
 N_BATCHES = 250
 N_SIMS = 20
-output_file = 'output.xlsx'
+output_file = 'output'
 # ######################### Create Datasets #################################
 # create dataset with a conditioned stimulus (CS) and context.  the CS has
 # 5 elements and the context has 10 creating an input vector of 15 total
@@ -157,6 +158,7 @@ def convert_hipp_hidd_layer(hipp_hidd_list):
     return return_list
 
 def run_nets(model='i', **kwargs):
+    start_time = datetime.datetime.now()
     model_dict = {
         'i': 'intact',
         'l': 'lesion',
@@ -286,11 +288,14 @@ def run_nets(model='i', **kwargs):
         cort_us_present_low_out_list, cort_us_absent_low_out_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_low_out_list, hipp_hidd_list)
         c_dist, h_dist = get_hamm_dist(cort_us_absent_low_out_list, cort_us_present_low_out_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
         net_output = create_dataframe(cort_us_absent_up_out_list, cort_us_present_up_out_list, c_dist, h_dist)
+    build_time = datetime.datetime.now() - start_time
+    print('...............Total build time for simulation {} was {} seconds'.format(kwargs['count'], build_time.seconds))
     return net_output
 
-def find_criterion(df, column, threshold):
+def find_criterion(df, column, threshold, model):
     try:
         crit = df.loc[df[str(column)] >= threshold].index.values[0]
+        print('Threshold {} for {} model reached at block {}'.format(threshold, model, crit))
     except IndexError:
         return 'Criterion not reached'
     return crit
@@ -306,18 +311,23 @@ def run_sims(num_sims, **kwargs):
         df_list.append(df)
     return df_list
 
-def create_output(df_list, filename):
+def create_output(df_list, filename, filetype, model):
     df_concat = pd.concat(df_list)
     df_concat_by_index = df_concat.groupby(df_concat.index)
     df_final = df_concat_by_index.mean().round(decimals=2)
-    xl_writer = pd.ExcelWriter('output.xlsx')
-    df_final.to_excel(xl_writer, 'Sheet2')
-    xl_writer.save()
+    find_criterion(df_final, 'XA', 0.9, model)
+    if filetype == 'xls':
+        xl_writer = pd.ExcelWriter(filename + '.xlsx')
+        df_final.to_excel(xl_writer, 'Sheet1')
+        xl_writer.save()
+    elif filetype == 'csv':
+        df_final.to_csv(filename + '.csv')
     df_final[['X', 'XA']].plot()
     return df_final
 
 if __name__ == '__main__':
     user_response = input('Select model type: intact(i), lesion(l), phystogimine(p), scopolomine(s): ')
+    user_filetype = input('Select file type: CSV(csv), Excel(xls): ')
     print('Building datasets...')
     input_var = build_dataset()
     print('Dataset built as :')
@@ -332,5 +342,5 @@ if __name__ == '__main__':
                         targets=targets,
                         input_var=input_var,
                         index=cs_index)
-    df_final = create_output(df_list, output_file)
+    df_final = create_output(df_list, output_file, user_filetype, user_response)
     plt.show()
