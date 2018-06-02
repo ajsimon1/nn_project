@@ -315,13 +315,14 @@ def create_output(df_list, filename, filetype, model):
     df_concat = pd.concat(df_list)
     df_concat_by_index = df_concat.groupby(df_concat.index)
     df_final = df_concat_by_index.mean().round(decimals=2)
+    mod_suf = '_' + str(model)
     find_criterion(df_final, 'XA', 0.9, model)
     if filetype == 'xls':
-        xl_writer = pd.ExcelWriter(filename + '.xlsx')
+        xl_writer = pd.ExcelWriter(filename + mod_suf + '.xlsx')
         df_final.to_excel(xl_writer, 'Sheet1')
         xl_writer.save()
     elif filetype == 'csv':
-        df_final.to_csv(filename + '.csv')
+        df_final.to_csv(filename + mod_suf + '.csv')
     df_final[['X', 'XA']].plot()
     return df_final
 
