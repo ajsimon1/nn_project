@@ -1,60 +1,81 @@
+import datetime
 import lasagne
 import theano
-import matplotlib.pyplot as plt
+
 import numpy as np
 import pandas as pd
+
+import matplotlib.pyplot as plt
 import theano.tensor as T
-import datetime
 
 # ######################## Define Constants #################################
-N_CS = 5
-N_CONTEXT = 10
-N_SAMPLES = 25
-N_BATCHES = 250
-N_SIMS = 20
-output_file = 'output'
-# ######################### Create Datasets #################################
-# create dataset with a conditioned stimulus (CS) and context.  the CS has
-# 5 elements and the context has 10 creating an input vector of 15 total
-# for the purposes of this model the number of samples will be 25 creating
-# a total input shape of (25,15)
+N_CS = 5 # num of elements in conditioned stimulus (CS)
+N_CONTEXT = 10 # num of elements in context
+N_SAMPLES = 25 # num of vectors within the input dataset
+N_BATCHES = 250 # num of datasets present in a single pass through the network
+N_SIMS = 20 # num of forward and backward iterations
+output_file = 'network_output' # name of csv/xlsx file
+
+# ######################### Create Data #####################################
 
 def build_dataset(n_cs=N_CS, n_context=N_CONTEXT, n_samples=N_SAMPLES):
-    # build out cs portion of input var
+    """ Build input dataset, constants specified at start of application default
+        Returns -> ndarray of shape (n_samples, (n_cs + n_context))
+    """
+    # create 2d vector of zeroes of shape (n_samples, n_cs)
     cs = [[0 for i in range(n_cs)] for j in range(n_samples)]
     rand_num = np.random.randint(0, high=len(cs))
+    # assign the first element of a random vector as 1, this respresents the
+    # vector which the network responds with the unconditioned resopnse
     cs[rand_num][0] = 1.0
-
-    # build out context portion of input var
+    # build context as random binary values of length n_context
     context = [float(np.random.randint(0, high=2)) for i in range(n_context)]
-
-    # build input var
     input_var = []
+    # add an indetical context vetor for each cs vector, creating input dataset
     for array_item in cs:
         input_var.append(array_item + context)
     return np.asarray(input_var)
 
 def build_targets(input_var):
+    """ Build target vector serve as prediction values during training
+        Return -> ndarray of shape (n_samples, 1)
+        Return -> cs_index indicating which vector in the dataset contains the
+        expected unconditioned response
+    """
     targets = []
+    # using the input var to ensure shape consistency, a 1 is added to the
+    # target vector at an index matching the input dataset
     for item in input_var:
         if np.any(item[0] == 1.0):
             targets.append(1.0)
         else:
             targets.append(0.0)
-    cs_index = targets.index( 1.)
+            # the index of the vector expecting the unconditioned response is
+            # noted and returned
+    cs_index = targets.index(1.)
     return np.asarray(targets), cs_index
 
 # ################## Build Lower Cortical Network #############################
 def build_cort_low_net(input_var=None):
+    """ Lower cortical network represents the hidden layer in normal MLP
+        architecture.  The output will be passed to the upper cortical network
+        The weights are trained using the hidden layer output of the Hippocampal
+        network
+        Return -> output layer formula
+    """
+    # input shape ('None',15) allows for variable input constrained by size of
+    # input datset
     l_input = lasagne.layers.InputLayer(shape=(None, 15),
                                         input_var=input_var)
+    # 'hidden' layer contains 40 nodes randomly set to values between -3.0
+    # and 3.0.  activation functions is rectify to optimize performance
     l_output = lasagne.layers.DenseLayer(
                 l_input,
                 num_units=40,
                 W=lasagne.init.Uniform(range=3.0),
                 nonlinearity=lasagne.nonlinearities.rectify)
     return l_output
-
+# TODO start here
 # ################## Build Upper Cortical Network #############################
 def build_cort_up_net(input_var=None):
     l_input = lasagne.layers.InputLayer(shape=(None, 40),
