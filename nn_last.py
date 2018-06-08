@@ -156,10 +156,10 @@ def get_hamm_dist(cort_abs_list, cort_pres_list, hipp_abs_list, hipp_pres_list):
     c_dist_list = []
     h_dist_list = []
     for item in range(len(cort_pres_list)):
-        c_dist = np.absolute(np.subtract(np.asarray(cort_abs_list[item]), np.asarray(cort_pres_list[item])))
+        c_dist = np.absolute(np.subtract(np.asarray(cort_pres_list[item]), np.asarray(cort_abs_list[item])))
         c_dist_list.append(np.sum(c_dist))
     for item in range(len(hipp_pres_list)):
-        h_dist = np.absolute(np.subtract(np.asarray(hipp_abs_list[item]), np.asarray(hipp_pres_list[item])))
+        h_dist = np.absolute(np.subtract(np.asarray(hipp_pres_list[item]), np.asarray(hipp_abs_list[item])))
         h_dist_list.append(np.sum(h_dist))
     return c_dist_list, h_dist_list
 
@@ -256,7 +256,7 @@ def run_nets(model='i', **kwargs):
     elif model == 's':
         hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
         hipp_params = lasagne.layers.get_all_params(hipp_out_layer, trainable=True)
-        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.001, momentum=0.5)
+        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.0001, momentum=0.5)
         feed_forward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
         back_update_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], updates=hipp_updates, allow_input_downcast=True)
         hipp_hidd_list, hipp_out_list = iter_hipp_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
@@ -280,7 +280,7 @@ def run_nets(model='i', **kwargs):
         cort_us_present_low_out_list, cort_us_absent_low_out_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_low_out_list, hipp_hidd_list)
         c_dist, h_dist = get_hamm_dist(cort_us_absent_low_out_list, cort_us_present_low_out_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
         net_output = create_dataframe(cort_us_absent_up_out_list, cort_us_present_up_out_list, c_dist, h_dist)
-    else:
+    elif model == 'l':
         cort_low_out_layer.params[cort_low_out_layer.W].remove('trainable')
         cort_low_out_layer.params[cort_low_out_layer.b].remove('trainable')
         hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
