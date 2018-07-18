@@ -5,4 +5,5 @@
 *.xls
 *.doc
 *.docx
-*checkpoint.ipynb
+*.ipynb
+*.pdf
