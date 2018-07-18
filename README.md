@@ -1,8 +1,10 @@
 ## A computational model of learning acquisition based on empirical results of animal responses in the eye blink classical conditioning paradigm
 
-This computational model aim to mimic empirical results seen in animal models during the acquisition of a learned behavior via classical conditioning.  The conditioning paradigm involves training a rabbit to respond with a reflexive eyeblink to a conditioned stimulus, usually a tone.  This is accomplished by pairing the tone with an unconditioned stimulus, a puff of air, that naturally produces the reflexive eyeblink.  The acquisition can be seen by the below ***learning curve***.  
+This computational model aim to mimic empirical results seen in animal models during the acquisition of a learned behavior via classical conditioning.  The conditioning paradigm involves training a rabbit to respond with a reflexive eyeblink to a conditioned stimulus, usually a tone.  This is accomplished by pairing the tone with an unconditioned stimulus, a puff of air, that naturally produces the reflexive eyeblink.  
 
-##### TODO add learning curve image from empirical study
+### TODO explain image below
+
+![Learning Curve](.\eyeblinkImage.jpg)
 
 In code, the empirical data can be mimicked by building a simple
 multi-layer perceptron *(MLP)*, linked to an autoencoder. The purpose of 2 networks is beyond the scope of the post, but suffice it to say it more closely resembles the inner workings of the animal model.  On to the code.
@@ -12,6 +14,8 @@ The source code can be found at [this](https://github.com/ajsimon1/nn_project) r
 Or you can clone by `git clone https://github.com/ajsimon1/nn_project.git`,
 
 and
+
+`cd nn_project` ;
 
 `pip install -r requirements.txt`
 
