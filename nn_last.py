@@ -1,59 +1,81 @@
+import datetime
 import lasagne
 import theano
-import matplotlib.pyplot as plt
+
 import numpy as np
 import pandas as pd
+
+import matplotlib.pyplot as plt
 import theano.tensor as T
 
 # ######################## Define Constants #################################
-N_CS = 5
-N_CONTEXT = 10
-N_SAMPLES = 25
-N_BATCHES = 250
-N_SIMS = 20
-output_file = 'output.xlsx'
-# ######################### Create Datasets #################################
-# create dataset with a conditioned stimulus (CS) and context.  the CS has
-# 5 elements and the context has 10 creating an input vector of 15 total
-# for the purposes of this model the number of samples will be 25 creating
-# a total input shape of (25,15)
+N_CS = 5 # num of elements in conditioned stimulus (CS)
+N_CONTEXT = 10 # num of elements in context
+N_SAMPLES = 25 # num of vectors within the input dataset
+N_BATCHES = 250 # num of datasets present in a single pass through the network
+N_SIMS = 20 # num of forward and backward iterations
+output_file = 'network_output' # name of csv/xlsx file
+
+# ######################### Create Data #####################################
 
 def build_dataset(n_cs=N_CS, n_context=N_CONTEXT, n_samples=N_SAMPLES):
-    # build out cs portion of input var
+    """ Build input dataset, constants specified at start of application default
+        Returns -> ndarray of shape (n_samples, (n_cs + n_context))
+    """
+    # create 2d vector of zeroes of shape (n_samples, n_cs)
     cs = [[0 for i in range(n_cs)] for j in range(n_samples)]
     rand_num = np.random.randint(0, high=len(cs))
+    # assign the first element of a random vector as 1, this respresents the
+    # vector which the network responds with the unconditioned resopnse
     cs[rand_num][0] = 1.0
-
-    # build out context portion of input var
+    # build context as random binary values of length n_context
     context = [float(np.random.randint(0, high=2)) for i in range(n_context)]
-
-    # build input var
     input_var = []
+    # add an indetical context vetor for each cs vector, creating input dataset
     for array_item in cs:
         input_var.append(array_item + context)
     return np.asarray(input_var)
 
 def build_targets(input_var):
+    """ Build target vector serve as prediction values during training
+        Return -> ndarray of shape (n_samples, 1)
+        Return -> cs_index indicating which vector in the dataset contains the
+        expected unconditioned response
+    """
     targets = []
+    # using the input var to ensure shape consistency, a 1 is added to the
+    # target vector at an index matching the input dataset
     for item in input_var:
         if np.any(item[0] == 1.0):
             targets.append(1.0)
         else:
             targets.append(0.0)
-    cs_index = targets.index( 1.)
+            # the index of the vector expecting the unconditioned response is
+            # noted and returned
+    cs_index = targets.index(1.)
     return np.asarray(targets), cs_index
 
 # ################## Build Lower Cortical Network #############################
 def build_cort_low_net(input_var=None):
+    """ Lower cortical network represents the hidden layer in normal MLP
+        architecture.  The output will be passed to the upper cortical network
+        The weights are trained using the hidden layer output of the Hippocampal
+        network
+        Return -> output layer formula
+    """
+    # input shape ('None',15) allows for variable input constrained by size of
+    # input datset
     l_input = lasagne.layers.InputLayer(shape=(None, 15),
                                         input_var=input_var)
+    # 'hidden' layer contains 40 nodes randomly set to values between -3.0
+    # and 3.0.  activation functions is rectify to optimize performance
     l_output = lasagne.layers.DenseLayer(
                 l_input,
                 num_units=40,
                 W=lasagne.init.Uniform(range=3.0),
                 nonlinearity=lasagne.nonlinearities.rectify)
     return l_output
-
+# TODO start here
 # ################## Build Upper Cortical Network #############################
 def build_cort_up_net(input_var=None):
     l_input = lasagne.layers.InputLayer(shape=(None, 40),
@@ -134,10 +156,10 @@ def get_hamm_dist(cort_abs_list, cort_pres_list, hipp_abs_list, hipp_pres_list):
     c_dist_list = []
     h_dist_list = []
     for item in range(len(cort_pres_list)):
-        c_dist = np.absolute(np.subtract(np.asarray(cort_abs_list[item]), np.asarray(cort_pres_list[item])))
+        c_dist = np.absolute(np.subtract(np.asarray(cort_pres_list[item]), np.asarray(cort_abs_list[item])))
         c_dist_list.append(np.sum(c_dist))
     for item in range(len(hipp_pres_list)):
-        h_dist = np.absolute(np.subtract(np.asarray(hipp_abs_list[item]), np.asarray(hipp_pres_list[item])))
+        h_dist = np.absolute(np.subtract(np.asarray(hipp_pres_list[item]), np.asarray(hipp_abs_list[item])))
         h_dist_list.append(np.sum(h_dist))
     return c_dist_list, h_dist_list
 
@@ -157,6 +179,7 @@ def convert_hipp_hidd_layer(hipp_hidd_list):
     return return_list
 
 def run_nets(model='i', **kwargs):
+    start_time = datetime.datetime.now()
     model_dict = {
         'i': 'intact',
         'l': 'lesion',
@@ -233,7 +256,7 @@ def run_nets(model='i', **kwargs):
     elif model == 's':
         hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
         hipp_params = lasagne.layers.get_all_params(hipp_out_layer, trainable=True)
-        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.001, momentum=0.5)
+        hipp_updates = lasagne.updates.momentum(hipp_loss, hipp_params, learning_rate=0.0001, momentum=0.5)
         feed_forward_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], allow_input_downcast=True)
         back_update_hipp = theano.function([X_data_hipp], [hipp_hid_formula, hipp_out_formula], updates=hipp_updates, allow_input_downcast=True)
         hipp_hidd_list, hipp_out_list = iter_hipp_net(N_BATCHES, feed_forward_hipp, back_update_hipp, kwargs['input_var'])
@@ -257,7 +280,7 @@ def run_nets(model='i', **kwargs):
         cort_us_present_low_out_list, cort_us_absent_low_out_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_low_out_list, hipp_hidd_list)
         c_dist, h_dist = get_hamm_dist(cort_us_absent_low_out_list, cort_us_present_low_out_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
         net_output = create_dataframe(cort_us_absent_up_out_list, cort_us_present_up_out_list, c_dist, h_dist)
-    else:
+    elif model == 'l':
         cort_low_out_layer.params[cort_low_out_layer.W].remove('trainable')
         cort_low_out_layer.params[cort_low_out_layer.b].remove('trainable')
         hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
@@ -286,11 +309,14 @@ def run_nets(model='i', **kwargs):
         cort_us_present_low_out_list, cort_us_absent_low_out_list, hipp_us_present_hid_list, hipp_us_absent_hid_list = get_hid_abs_value(kwargs['index'], cort_low_out_list, hipp_hidd_list)
         c_dist, h_dist = get_hamm_dist(cort_us_absent_low_out_list, cort_us_present_low_out_list, hipp_us_absent_hid_list, hipp_us_present_hid_list)
         net_output = create_dataframe(cort_us_absent_up_out_list, cort_us_present_up_out_list, c_dist, h_dist)
+    build_time = datetime.datetime.now() - start_time
+    print('...............Total build time for simulation {} was {} seconds'.format(kwargs['count'], build_time.seconds))
     return net_output
 
-def find_criterion(df, column, threshold):
+def find_criterion(df, column, threshold, model):
     try:
         crit = df.loc[df[str(column)] >= threshold].index.values[0]
+        print('Threshold {} for {} model reached at block {}'.format(threshold, model, crit))
     except IndexError:
         return 'Criterion not reached'
     return crit
@@ -306,18 +332,24 @@ def run_sims(num_sims, **kwargs):
         df_list.append(df)
     return df_list
 
-def create_output(df_list, filename):
+def create_output(df_list, filename, filetype, model):
     df_concat = pd.concat(df_list)
     df_concat_by_index = df_concat.groupby(df_concat.index)
     df_final = df_concat_by_index.mean().round(decimals=2)
-    xl_writer = pd.ExcelWriter('output.xlsx')
-    df_final.to_excel(xl_writer, 'Sheet2')
-    xl_writer.save()
+    mod_suf = '_' + str(model)
+    find_criterion(df_final, 'XA', 0.9, model)
+    if filetype == 'xls':
+        xl_writer = pd.ExcelWriter(filename + mod_suf + '.xlsx')
+        df_final.to_excel(xl_writer, 'Sheet1')
+        xl_writer.save()
+    elif filetype == 'csv':
+        df_final.to_csv(filename + mod_suf + '.csv')
     df_final[['X', 'XA']].plot()
     return df_final
 
 if __name__ == '__main__':
     user_response = input('Select model type: intact(i), lesion(l), phystogimine(p), scopolomine(s): ')
+    user_filetype = input('Select file type: CSV(csv), Excel(xls): ')
     print('Building datasets...')
     input_var = build_dataset()
     print('Dataset built as :')
@@ -332,5 +364,5 @@ if __name__ == '__main__':
                         targets=targets,
                         input_var=input_var,
                         index=cs_index)
-    df_final = create_output(df_list, output_file)
+    df_final = create_output(df_list, output_file, user_filetype, user_response)
     plt.show()
