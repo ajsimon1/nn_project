@@ -5,10 +5,5 @@
 *.xls
 *.doc
 *.docx
-<<<<<<< HEAD
 *.ipynb
 *.pdf
-=======
-*checkpoint.ipynb
-*.csv
->>>>>>> 398dd1116e3d0fbd263b646e87af0fbf87c99971
