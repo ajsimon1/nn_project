@@ -47,4 +47,33 @@ N_SAMPLES = 25 # num of vectors within the input dataset
 N_BATCHES = 250 # num of datasets present in a single pass through the network
 N_SIMS = 20 # num of forward and backward iterations
 output_file = 'network_output' # name of csv/xlsx file
+# np.random.seed(7) # random generator seed to ensure reproducibility
+```
+
+Next we build the input dataset which consists of a (25,15) array of binary data.  
+The defaults values are set as constants above, but this can me modified based
+on need. The random module is used without a `seed` specified to ensure randomness
+throughout testing, this was done intentionally. The seed line above can be
+uncommented to set the seed for the generator.
+
+```python
+# ######################### Create Data #####################################
+def build_dataset(n_cs=N_CS, n_context=N_CONTEXT, n_samples=N_SAMPLES):
+    """ Build input dataset using constants specified at start of application
+        as defaults
+        Returns -> ndarray of shape (n_samples, (n_cs + n_context))
+    """
+    # create 2d vector of zeroes of shape (n_samples, n_cs)
+    cs = [[0 for i in range(n_cs)] for j in range(n_samples)]
+    rand_num = np.random.randint(0, high=len(cs))
+    # assign the first element of a random vector as 1, this respresents the
+    # vector which the network responds with the unconditioned resopnse
+    cs[rand_num][0] = 1.0
+    # build context as random binary values of length n_context
+    context = [float(np.random.randint(0, high=2)) for i in range(n_context)]
+    input_var = []
+    # add an indetical context vetor for each cs vector, creating input dataset
+    for array_item in cs:
+        input_var.append(array_item + context)
+    return np.asarray(input_var)
 ```

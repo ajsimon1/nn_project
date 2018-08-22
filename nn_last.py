@@ -17,9 +17,9 @@ N_SIMS = 20 # num of forward and backward iterations
 output_file = 'network_output' # name of csv/xlsx file
 
 # ######################### Create Data #####################################
-
 def build_dataset(n_cs=N_CS, n_context=N_CONTEXT, n_samples=N_SAMPLES):
-    """ Build input dataset, constants specified at start of application default
+    """ Build input dataset using constants specified at start of application
+        as defaults
         Returns -> ndarray of shape (n_samples, (n_cs + n_context))
     """
     # create 2d vector of zeroes of shape (n_samples, n_cs)
@@ -191,13 +191,15 @@ def run_nets(model='i', **kwargs):
     X_data_cort_up = T.matrix('X_data_cort_up')
     X_data_hipp = T.matrix('X_data_hipp')
     # create nn models
-    print('Building networks based on {} model type, {} simulation...'.format(model_dict[str(model)], kwargs['count']))
+    print('Building networks based on {} model type, {} ' \
+            'simulation...'.format(model_dict[str(model)], kwargs['count']))
     cort_low_out_layer = build_cort_low_net(input_var=X_data_cort_low)
     cort_low_out_formula = lasagne.layers.get_output(cort_low_out_layer)
     cort_up_out_layer = build_cort_up_net(input_var=X_data_cort_up)
     cort_up_out_formula = lasagne.layers.get_output(cort_up_out_layer)
     hipp_hid_layer, hipp_out_layer = build_hipp_net(input_var=X_data_hipp)
-    hipp_hid_formula, hipp_out_formula = lasagne.layers.get_output([hipp_hid_layer, hipp_out_layer])
+    hipp_hid_formula, hipp_out_formula = lasagne.layers.get_output([hipp_hid_layer,
+                                                                    hipp_out_layer])
     # branching point for different models based on model type
     if model == 'i':
         hipp_loss = lasagne.objectives.squared_error(hipp_out_formula, kwargs['input_var']).mean()
